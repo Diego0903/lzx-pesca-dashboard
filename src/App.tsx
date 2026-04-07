@@ -248,7 +248,7 @@ export default function App() {
         )}
 
         {/* Conteúdo principal */}
-        {!loading && insights.length > 0 && (
+        {!loading && selectedAccount && hasAdsAccess && (
           <>
             <MetricsSummary insights={insights} />
             <div style={{ marginTop: 24 }}>

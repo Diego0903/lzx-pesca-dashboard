@@ -53,7 +53,6 @@ export default function AccountSelector({ accounts, selected, onChange }: Props)
               <div style={{ fontSize: 12, color: isSelected ? 'rgba(255,255,255,0.7)' : 'var(--text-muted)', display: 'flex', gap: 8 }}>
                 <span style={{ color: isSelected ? 'rgba(255,255,255,0.7)' : status.color }}>● {status.label}</span>
                 <span>{acc.currency}</span>
-                {acc.amount_spent && <span>R$ {(parseFloat(acc.amount_spent) / 100).toFixed(2)} investido</span>}
               </div>
             </button>
           )

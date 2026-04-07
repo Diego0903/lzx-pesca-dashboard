@@ -1,9 +1,14 @@
 'use strict'
 require('dotenv').config()
-const app = require('./api/index.js')
 
 const PORT = 3001
-app.listen(PORT, () => {
-  console.log(`\n🎣 LZX Pesca API Server rodando em http://localhost:${PORT}`)
-  console.log(`📊 Dashboard em http://localhost:3000\n`)
+
+import('./api/index.js').then(({ default: app }) => {
+  app.listen(PORT, () => {
+    console.log(`\n🎣 LZX Pesca API Server rodando em http://localhost:${PORT}`)
+    console.log(`📊 Dashboard em http://localhost:3000\n`)
+  })
+}).catch(err => {
+  console.error('Erro ao iniciar servidor:', err)
+  process.exit(1)
 })

@@ -1,8 +1,10 @@
-'use strict'
-const express = require('express')
-const cors = require('cors')
-const { mkdirSync, writeFileSync, existsSync, readFileSync, readdirSync } = require('fs')
-const { join } = require('path')
+import express from 'express'
+import cors from 'cors'
+import { mkdirSync, writeFileSync, existsSync, readFileSync, readdirSync } from 'fs'
+import { join, dirname } from 'path'
+import { fileURLToPath } from 'url'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const TOKEN = process.env.META_TOKEN
 if (!TOKEN) throw new Error('META_TOKEN não definido')
@@ -101,4 +103,4 @@ app.get('/api/cached/:filename', (req, res) => {
   else res.status(404).json({ error: 'Arquivo não encontrado' })
 })
 
-module.exports = app
+export default app

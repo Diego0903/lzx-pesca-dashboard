@@ -45,3 +45,27 @@ body {
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--gold-dim); }
+
+/* ── Responsive ─────────────────────────────────────── */
+.header-title { display: flex; align-items: center; gap: 16px; }
+.header-title-text { display: block; }
+.header-divider { display: block; }
+.main-content { padding: 24px; max-width: 1400px; margin: 0 auto; }
+.report-btn-label { display: inline; }
+.campaign-filter { width: 220px; }
+.date-filter-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 300px;
+  max-width: calc(100vw - 24px);
+}
+
+@media (max-width: 600px) {
+  .header-title-text { display: none; }
+  .header-divider { display: none; }
+  .main-content { padding: 16px 12px; }
+  .report-btn-label { display: none; }
+  .campaign-filter { width: 130px; }
+  .date-filter-dropdown { right: auto; left: 0; }
+}

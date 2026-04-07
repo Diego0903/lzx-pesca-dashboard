@@ -152,9 +152,10 @@ export default function CampaignTable({ insights }: Props) {
           placeholder="Filtrar por nome..."
           value={filter}
           onChange={e => setFilter(e.target.value)}
+          className="campaign-filter"
           style={{
             background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 6,
-            padding: '6px 12px', color: 'var(--text)', fontSize: 13, outline: 'none', width: 220,
+            padding: '6px 12px', color: 'var(--text)', fontSize: 13, outline: 'none',
           }}
         />
       </div>

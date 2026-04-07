@@ -130,18 +130,14 @@ export default function App() {
         height: 64,
       }}>
         {/* Logo + label */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div className="header-title">
           <img
             src="/logo.webp"
             alt="LZX Pesca"
             style={{ height: 36, objectFit: 'contain', display: 'block' }}
           />
-          <div style={{
-            width: 1,
-            height: 32,
-            background: 'rgba(196,163,90,0.25)',
-          }} />
-          <div>
+          <div className="header-divider" style={{ width: 1, height: 32, background: 'rgba(196,163,90,0.25)' }} />
+          <div className="header-title-text">
             <div style={{
               fontFamily: "'Rubik', sans-serif",
               fontWeight: 600,
@@ -193,13 +189,13 @@ export default function App() {
                 textTransform: 'uppercase',
               }}
             >
-              {generatingReport ? 'Gerando...' : '📄 Relatório'}
+              📄 <span className="report-btn-label">{generatingReport ? 'Gerando...' : 'Relatório'}</span>
             </button>
           )}
         </div>
       </header>
 
-      <main style={{ padding: '24px', maxWidth: 1400, margin: '0 auto' }}>
+      <main className="main-content">
         {/* Aviso de permissões */}
         {tokenInfo && !hasAdsAccess && (
           <TokenWarning tokenInfo={tokenInfo} />

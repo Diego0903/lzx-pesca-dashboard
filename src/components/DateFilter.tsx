@@ -94,16 +94,12 @@ export default function DateFilter({ value, onChange }: Props) {
             style={{ position: 'fixed', inset: 0, zIndex: 199 }}
             onClick={() => setOpen(false)}
           />
-          <div style={{
-            position: 'absolute',
-            top: 'calc(100% + 6px)',
-            right: 0,
+          <div className="date-filter-dropdown" style={{
             zIndex: 200,
             background: 'var(--surface)',
             border: '1px solid var(--border)',
             borderRadius: 10,
             padding: 16,
-            width: 300,
             boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
           }}>
             {/* Presets */}

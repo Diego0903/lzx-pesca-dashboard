@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, Legend,
+  Tooltip, ResponsiveContainer,
 } from 'recharts'
 import type { TimeSeriesPoint } from '../types'
 import { format, parseISO } from 'date-fns'

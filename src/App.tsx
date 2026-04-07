@@ -164,7 +164,7 @@ export default function App() {
               fontSize: 12,
               fontWeight: 600,
             }}>
-              {tokenInfo.is_valid ? '● Conectado' : '● Desconectado'}
+              ● <span className="report-btn-label">{tokenInfo.is_valid ? 'Conectado' : 'Desconectado'}</span>
             </span>
           )}
           {hasAdsAccess && (

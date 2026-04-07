@@ -179,7 +179,7 @@ export default function InstagramInsights({ dateRange }: Props) {
             {profile.name && (
               <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 6 }}>{profile.name}</div>
             )}
-            <div style={{ display: 'flex', gap: 20 }}>
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 13 }}>
                 <strong style={{ color: 'var(--text)' }}>{fmtNum(profile.followers_count)}</strong>
                 <span style={{ color: 'var(--text-muted)', marginLeft: 4 }}>seguidores</span>

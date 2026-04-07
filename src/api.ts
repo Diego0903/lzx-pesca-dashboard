@@ -35,4 +35,11 @@ export const api = {
   },
   generateReport: (accountId: string, since?: string, until?: string) =>
     post<{ success: boolean; report: string; reportPath: string }>('/generate-report', { accountId, since, until }),
+  igDiscover: () => get<{ data?: Array<{ id: string; name: string; instagram_business_account?: { id: string; username: string; name: string; followers_count: number; profile_picture_url: string } }> }>('/instagram/discover'),
+  igProfile: (igUserId: string) => get<{ id: string; username: string; name: string; biography?: string; followers_count: number; follows_count: number; media_count: number; profile_picture_url: string; website?: string }>(`/instagram/profile/${igUserId}`),
+  igInsights: (igUserId: string, since?: string, until?: string) => {
+    const q = dateParams(since, until)
+    return get<{ data?: unknown[]; error?: { message: string } }>(`/instagram/insights/${igUserId}${q ? '?' + q : ''}`)
+  },
+  igMedia: (igUserId: string) => get<{ data?: unknown[]; error?: { message: string } }>(`/instagram/media/${igUserId}`),
 }

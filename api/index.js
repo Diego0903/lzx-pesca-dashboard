@@ -92,6 +92,49 @@ app.get('/api/insights/account/:accountId/campaigns', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
+app.get('/api/instagram/discover', async (_req, res) => {
+  try {
+    const data = await metaFetch('me/accounts', {
+      fields: 'id,name,instagram_business_account{id,username,name,followers_count,profile_picture_url}',
+      limit: 50,
+    })
+    res.json(data)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+app.get('/api/instagram/profile/:igUserId', async (req, res) => {
+  try {
+    const data = await metaFetch(req.params.igUserId, {
+      fields: 'id,username,name,biography,followers_count,follows_count,media_count,profile_picture_url,website',
+    })
+    res.json(data)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+app.get('/api/instagram/insights/:igUserId', async (req, res) => {
+  const { igUserId } = req.params
+  const { since, until } = req.query
+  try {
+    const data = await metaFetch(`${igUserId}/insights`, {
+      metric: 'impressions,reach,profile_views',
+      period: 'day',
+      ...(since ? { since } : {}),
+      ...(until ? { until } : {}),
+    })
+    res.json(data)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+app.get('/api/instagram/media/:igUserId', async (req, res) => {
+  try {
+    const data = await metaFetch(`${req.params.igUserId}/media`, {
+      fields: 'id,caption,media_type,timestamp,like_count,comments_count,permalink,media_url,thumbnail_url',
+      limit: 12,
+    })
+    res.json(data)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
 app.get('/api/cached', (_req, res) => {
   try { res.json({ files: readdirSync(DATA_DIR).filter(f => f.endsWith('.json')) }) }
   catch { res.json({ files: [] }) }

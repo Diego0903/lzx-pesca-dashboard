@@ -70,3 +70,39 @@ export interface TokenStatus {
 }
 
 export type MetricKey = 'spend' | 'impressions' | 'clicks' | 'ctr' | 'cpc' | 'cpm' | 'reach'
+
+export interface IgProfile {
+  id: string
+  username: string
+  name: string
+  biography?: string
+  followers_count: number
+  follows_count: number
+  media_count: number
+  profile_picture_url: string
+  website?: string
+}
+
+export interface IgInsightValue {
+  value: number
+  end_time: string
+}
+
+export interface IgInsight {
+  name: string
+  period: string
+  values: IgInsightValue[]
+  title: string
+}
+
+export interface IgMedia {
+  id: string
+  caption?: string
+  media_type: 'IMAGE' | 'VIDEO' | 'CAROUSEL_ALBUM'
+  timestamp: string
+  like_count: number
+  comments_count: number
+  permalink: string
+  media_url?: string
+  thumbnail_url?: string
+}

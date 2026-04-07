@@ -8,6 +8,7 @@ import TimeSeriesChart from './components/TimeSeriesChart'
 import ReportModal from './components/ReportModal'
 import WhatsAppSection from './components/WhatsAppSection'
 import DateFilter, { type DateRange } from './components/DateFilter'
+import InstagramInsights from './components/InstagramInsights'
 import type { CampaignInsight, TimeSeriesPoint } from './types'
 
 interface TokenInfo {
@@ -41,6 +42,7 @@ export default function App() {
   const [reportContent, setReportContent] = useState('')
   const [generatingReport, setGeneratingReport] = useState(false)
   const [dateRange, setDateRange] = useState<DateRange>({ since: '', until: '', preset: 'maximum' })
+  const [activeTab, setActiveTab] = useState<'ads' | 'instagram'>('ads')
 
   // Verifica token ao montar
   useEffect(() => {
@@ -225,6 +227,36 @@ export default function App() {
           />
         )}
 
+        {/* Abas */}
+        {hasAdsAccess && (
+          <div style={{ display: 'flex', gap: 4, marginBottom: 24, borderBottom: '1px solid var(--border)', paddingBottom: 0 }}>
+            {([
+              { key: 'ads', label: '📊 Meta Ads' },
+              { key: 'instagram', label: '📸 Instagram' },
+            ] as const).map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  borderBottom: `2px solid ${activeTab === tab.key ? 'var(--gold)' : 'transparent'}`,
+                  padding: '10px 18px',
+                  cursor: 'pointer',
+                  color: activeTab === tab.key ? 'var(--gold)' : 'var(--text-muted)',
+                  fontWeight: activeTab === tab.key ? 700 : 400,
+                  fontSize: 14,
+                  fontFamily: "'Rubik', sans-serif",
+                  transition: 'all 0.15s',
+                  marginBottom: -1,
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Loading */}
         {loading && (
           <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)' }}>
@@ -247,8 +279,8 @@ export default function App() {
           </div>
         )}
 
-        {/* Conteúdo principal */}
-        {!loading && selectedAccount && hasAdsAccess && (
+        {/* Aba Meta Ads */}
+        {activeTab === 'ads' && !loading && selectedAccount && hasAdsAccess && (
           <>
             <MetricsSummary insights={insights} />
             <div style={{ marginTop: 24 }}>
@@ -261,6 +293,11 @@ export default function App() {
               <CampaignTable insights={insights} />
             </div>
           </>
+        )}
+
+        {/* Aba Instagram */}
+        {activeTab === 'instagram' && hasAdsAccess && (
+          <InstagramInsights dateRange={dateRange} />
         )}
 
         {/* Estado inicial sem acesso */}

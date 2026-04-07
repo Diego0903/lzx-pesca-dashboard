@@ -1,8 +1,5 @@
 import { useState } from 'react'
-import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer,
-} from 'recharts'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import type { TimeSeriesPoint } from '../types'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'

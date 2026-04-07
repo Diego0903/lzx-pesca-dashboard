@@ -106,3 +106,12 @@ export interface IgMedia {
   media_url?: string
   thumbnail_url?: string
 }
+
+export interface IgStory {
+  id: string
+  timestamp: string
+  media_type: string
+  media_url?: string
+  thumbnail_url?: string
+  insights: Array<{ name: string; values: Array<{ value: number }> }>
+}

@@ -43,6 +43,8 @@ export default function App() {
   const [generatingReport, setGeneratingReport] = useState(false)
   const [dateRange, setDateRange] = useState<DateRange>({ since: '', until: '', preset: 'maximum' })
   const [activeTab, setActiveTab] = useState<'ads' | 'instagram'>('ads')
+  const [igUserId, setIgUserId] = useState<string>('')
+  const [showReportMenu, setShowReportMenu] = useState(false)
 
   // Verifica token ao montar
   useEffect(() => {
@@ -99,10 +101,17 @@ export default function App() {
     if (selectedAccount) loadAccountData(selectedAccount, dateRange)
   }, [selectedAccount, dateRange, loadAccountData])
 
-  const handleGenerateReport = async () => {
+  const handleGenerateReport = async (type: 'ads' | 'instagram' | 'all') => {
+    setShowReportMenu(false)
     setGeneratingReport(true)
     try {
-      const res = await api.generateReport(selectedAccount, dateRange.since || undefined, dateRange.until || undefined)
+      const res = await api.generateReport(
+        selectedAccount,
+        dateRange.since || undefined,
+        dateRange.until || undefined,
+        type,
+        igUserId || undefined,
+      )
       setReportContent(res.report)
       setShowReport(true)
     } catch (e) {
@@ -171,26 +180,37 @@ export default function App() {
             <DateFilter value={dateRange} onChange={setDateRange} />
           )}
           {selectedAccount && hasAdsAccess && (
-            <button
-              onClick={handleGenerateReport}
-              disabled={generatingReport}
-              style={{
-                background: 'var(--gold)',
-                color: '#1a1500',
-                border: 'none',
-                borderRadius: 6,
-                padding: '7px 16px',
-                fontSize: 13,
-                fontWeight: 700,
-                cursor: 'pointer',
-                opacity: generatingReport ? 0.6 : 1,
-                fontFamily: "'Rubik', sans-serif",
-                letterSpacing: '0.05em',
-                textTransform: 'uppercase',
-              }}
-            >
-              📄 <span className="report-btn-label">{generatingReport ? 'Gerando...' : 'Relatório'}</span>
-            </button>
+            <div style={{ position: 'relative' }}>
+              {showReportMenu && (
+                <>
+                  <div style={{ position: 'fixed', inset: 0, zIndex: 199 }} onClick={() => setShowReportMenu(false)} />
+                  <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 200, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', minWidth: 210, boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}>
+                    {([
+                      { key: 'ads', label: '📊 Apenas Meta Ads' },
+                      { key: 'instagram', label: '📸 Apenas Instagram' },
+                      { key: 'all', label: '📋 Meta Ads + Instagram' },
+                    ] as const).map(opt => (
+                      <button
+                        key={opt.key}
+                        onClick={() => handleGenerateReport(opt.key)}
+                        style={{ display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 'none', borderBottom: '1px solid var(--border)', padding: '12px 16px', color: 'var(--text)', cursor: 'pointer', fontSize: 13, fontWeight: 500 }}
+                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface2)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+              <button
+                onClick={() => setShowReportMenu(o => !o)}
+                disabled={generatingReport}
+                style={{ background: 'var(--gold)', color: '#1a1500', border: 'none', borderRadius: 6, padding: '7px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: generatingReport ? 0.6 : 1, fontFamily: "'Rubik', sans-serif", letterSpacing: '0.05em', textTransform: 'uppercase' }}
+              >
+                📄 <span className="report-btn-label">{generatingReport ? 'Gerando...' : 'Relatório'}</span>
+              </button>
+            </div>
           )}
         </div>
       </header>
@@ -293,7 +313,7 @@ export default function App() {
 
         {/* Aba Instagram */}
         {activeTab === 'instagram' && hasAdsAccess && (
-          <InstagramInsights dateRange={dateRange} />
+          <InstagramInsights dateRange={dateRange} onIgUserId={setIgUserId} />
         )}
 
         {/* Estado inicial sem acesso */}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { supabase, supabaseEnabled } from '../lib/supabase'
+import { supabase } from '../lib/supabase'
 import {
   mockLeads, mockInteractions, mockOrders,
   type Lead, type Interaction, type Order, type LeadStage,

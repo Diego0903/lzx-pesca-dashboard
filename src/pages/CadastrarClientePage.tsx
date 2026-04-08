@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthContext'
 import { fmtBRL } from '../utils/formatters'
 import type { LeadItem, ProductCategory, BrazilState, LeadOrigin, LeadStage } from '../data/mockCrm'
+import StageBadgeSelect from '../components/StageBadgeSelect'
 
 interface ItemRow {
   product: string
@@ -14,15 +15,6 @@ const EMPTY_ITEM: ItemRow = { product: '', category: 'Redes', qty: '' }
 const ORIGIN_OPTIONS: LeadOrigin[] = ['Google','Instagram','Facebook','WhatsApp','Indicação','Cliente Recorrente','Desconhecido']
 const STATE_OPTIONS: BrazilState[] = ['SC','RS','PR','SP','RJ','MG','BA','PA','CE','Outros']
 const CAT_OPTIONS: ProductCategory[] = ['Redes','Linhas','Tralhas','Cordas','Boias']
-
-const STAGE_LABEL: Record<LeadStage, { label: string; cls: string }> = {
-  novo:        { label: 'Novo',        cls: 'badge-blue' },
-  qualificado: { label: 'Qualificado', cls: 'badge-blue' },
-  orcamento:   { label: 'Orçamento',   cls: 'badge-gold' },
-  negociacao:  { label: 'Negociação',  cls: 'badge-orange' },
-  fechado:     { label: 'Fechado',     cls: 'badge-green' },
-  perdido:     { label: 'Perdido',     cls: 'badge-red' },
-}
 
 type Tab = 'cadastrar' | 'historico'
 
@@ -296,6 +288,7 @@ function MeusCadastrosHistory() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const [updatingId, setUpdatingId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     if (!supabase) { setLoading(false); return }
@@ -312,6 +305,33 @@ function MeusCadastrosHistory() {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  // Sincroniza a lista quando admin/dono move o stage no kanban
+  useEffect(() => {
+    if (!supabase) return
+    const sb = supabase
+    const ch = sb
+      .channel('funcionario-history')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, () => load())
+      .subscribe()
+    return () => { sb.removeChannel(ch) }
+  }, [load])
+
+  const updateStage = async (id: string, newStage: LeadStage) => {
+    if (!supabase) return
+    setUpdatingId(id)
+    const previous = leads
+    setLeads(prev => prev.map(l => l.id === id ? { ...l, stage: newStage } : l))
+    const { error: err } = await supabase
+      .from('leads')
+      .update({ stage: newStage, last_contact_at: new Date().toISOString() })
+      .eq('id', id)
+    if (err) {
+      alert('Erro ao atualizar status: ' + err.message)
+      setLeads(previous)
+    }
+    setUpdatingId(null)
+  }
 
   const filtered = leads.filter(l => {
     if (!search) return true
@@ -377,7 +397,7 @@ function MeusCadastrosHistory() {
       ) : (
         <div style={{ maxHeight: 'calc(100vh - 320px)', overflowY: 'auto' }}>
           {filtered.map(l => {
-            const stageMeta = STAGE_LABEL[l.stage] ?? STAGE_LABEL.novo
+            const isUpdating = updatingId === l.id
             return (
               <div key={l.id} style={{ padding: '14px 22px', borderBottom: '1px solid var(--border)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 6 }}>
@@ -389,7 +409,7 @@ function MeusCadastrosHistory() {
                       {l.whatsapp ?? '—'} · {l.city ?? '—'}/{l.state ?? '—'} · {l.origin ?? '—'}
                     </div>
                   </div>
-                  <span className={`badge ${stageMeta.cls}`}>{stageMeta.label}</span>
+                  <StageBadgeSelect value={l.stage} onChange={s => updateStage(l.id, s)} leadName={l.name} disabled={isUpdating} />
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 8 }}>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1 }}>

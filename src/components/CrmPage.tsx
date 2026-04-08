@@ -8,15 +8,10 @@ import type {
 import { useCrm } from '../hooks/useCrm'
 import { fmtBRL, fmtNum } from '../utils/formatters'
 import { exportToCsv, todayStamp } from '../utils/csv'
+import { STAGE_LIST, STAGE_META } from '../data/leadStages'
+import StageBadgeSelect from './StageBadgeSelect'
 
-const STAGES: { key: LeadStage; label: string; color: string }[] = [
-  { key: 'novo',        label: 'Novo Lead',        color: '#3b82f6' },
-  { key: 'qualificado', label: 'Qualificado',      color: '#a855f7' },
-  { key: 'orcamento',   label: 'Orçamento Enviado', color: '#c4a35a' },
-  { key: 'negociacao',  label: 'Negociação',       color: '#f97316' },
-  { key: 'fechado',     label: 'Fechado',          color: '#16a34a' },
-  { key: 'perdido',     label: 'Perdido',          color: '#dc2626' },
-]
+const STAGES = STAGE_LIST.map(key => ({ key, label: STAGE_META[key].longLabel, color: STAGE_META[key].color }))
 
 function isOverdue(iso?: string) {
   if (!iso) return false
@@ -146,9 +141,10 @@ interface ListProps {
   leads: Lead[]
   onSelect: (l: Lead) => void
   onDelete: (l: Lead) => void
+  onChangeStage: (id: string, stage: LeadStage) => void
 }
 
-function ClientList({ leads, onSelect, onDelete }: ListProps) {
+function ClientList({ leads, onSelect, onDelete, onChangeStage }: ListProps) {
   const [q, setQ] = useState('')
   const [stateFilter, setStateFilter] = useState<BrazilState | 'all'>('all')
   const [catFilter, setCatFilter] = useState<ProductCategory | 'all'>('all')
@@ -226,18 +222,21 @@ function ClientList({ leads, onSelect, onDelete }: ListProps) {
               key={l.id}
               style={{ display: 'flex', alignItems: 'stretch', borderBottom: '1px solid var(--border)' }}
             >
-              <button
-                type="button"
+              <div
+                role="button"
+                tabIndex={0}
                 onClick={() => onSelect(l)}
-                style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'transparent', border: 'none', padding: '12px 18px', cursor: 'pointer', color: 'var(--text)' }}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(l) } }}
+                style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'transparent', padding: '12px 18px', cursor: 'pointer', color: 'var(--text)' }}
                 onMouseEnter={e => (e.currentTarget.style.background = 'rgba(196,163,90,0.06)')}
                 onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, gap: 6 }}>
-                  <strong style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.name}</strong>
-                  <span className={`badge ${l.recurring ? 'badge-gold' : 'badge-blue'}`}>
-                    {l.recurring ? 'Recorrente' : 'Novo'}
-                  </span>
+                  <strong style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {l.name}
+                    {l.recurring && <span style={{ marginLeft: 6, fontSize: 9, color: 'var(--gold)', fontWeight: 600 }}>★ Recorrente</span>}
+                  </strong>
+                  <StageBadgeSelect value={l.stage} onChange={s => onChangeStage(l.id, s)} leadName={l.name} variant="longLabel" />
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {l.city}/{l.state} · {productSummary} · {fmtBRL(l.estimatedValue)}
@@ -248,7 +247,7 @@ function ClientList({ leads, onSelect, onDelete }: ListProps) {
                     {l.createdAt && ` · ${new Date(l.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}`}
                   </div>
                 )}
-              </button>
+              </div>
               <button
                 type="button"
                 onClick={() => {
@@ -757,7 +756,7 @@ export default function CrmPage() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 16, marginBottom: 20 }}>
-        <ClientList leads={leads} onSelect={setSelected} onDelete={handleDelete} />
+        <ClientList leads={leads} onSelect={setSelected} onDelete={handleDelete} onChangeStage={(id, stage) => void moveLeadStage(id, stage)} />
         <InteractionTimeline lead={effectiveSelected} interactions={interactions} onAdd={(i) => void addInteraction(i)} />
       </div>
 

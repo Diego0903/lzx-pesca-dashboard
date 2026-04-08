@@ -3,13 +3,38 @@ import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
-import type { OrderStatus, Order } from '../data/mockCrm'
+import type { Lead } from '../data/mockCrm'
 import { useCrm } from '../hooks/useCrm'
 import { fmtBRL, fmtNum } from '../utils/formatters'
 import { exportToCsv, todayStamp } from '../utils/csv'
 
-// ── Helpers de agregação a partir de orders reais ──────────────
-function buildMonthlyRevenue(orders: Order[]) {
+// PedidoView é uma projeção de Lead — vendas são leads com stage='fechado'.
+interface PedidoView {
+  id: string
+  client: string
+  product: string
+  category: string
+  state: string
+  value: number
+  date: string  // ISO
+  createdByName?: string
+}
+
+function leadToPedido(l: Lead): PedidoView {
+  return {
+    id: l.id,
+    client: l.name,
+    product: l.product || '—',         // mapper já fez items.map(i=>i.product).join(' · ')
+    category: l.category,
+    state: l.state,
+    value: l.estimatedValue,
+    date: l.createdAt ?? l.lastContactAt,
+    createdByName: l.createdByName,
+  }
+}
+
+
+function buildMonthlyRevenue(pedidos: PedidoView[]) {
   const months: { key: string; label: string; receita: number; pedidos: number }[] = []
   const now = new Date()
   for (let i = 5; i >= 0; i--) {
@@ -18,40 +43,34 @@ function buildMonthlyRevenue(orders: Order[]) {
     const label = d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '') + '/' + String(d.getFullYear()).slice(-2)
     months.push({ key, label, receita: 0, pedidos: 0 })
   }
-  for (const o of orders) {
-    const d = new Date(o.date)
+  for (const p of pedidos) {
+    const d = new Date(p.date)
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
     const slot = months.find(m => m.key === key)
-    if (slot) { slot.receita += o.value; slot.pedidos += 1 }
+    if (slot) { slot.receita += p.value; slot.pedidos += 1 }
   }
   return months.map(({ label, receita, pedidos }) => ({ month: label, receita, pedidos }))
 }
 
-function buildOrdersByState(orders: Order[]) {
+function buildOrdersByState(pedidos: PedidoView[]) {
   const map = new Map<string, number>()
-  for (const o of orders) map.set(o.state, (map.get(o.state) ?? 0) + 1)
+  for (const p of pedidos) map.set(p.state, (map.get(p.state) ?? 0) + 1)
   return Array.from(map.entries())
     .map(([estado, pedidos]) => ({ estado, pedidos }))
     .sort((a, b) => b.pedidos - a.pedidos)
 }
 
-function buildSalesByCategory(orders: Order[]) {
+function buildSalesByCategory(pedidos: PedidoView[]) {
   const map = new Map<string, { vendas: number; receita: number }>()
-  for (const o of orders) {
-    const cur = map.get(o.category) ?? { vendas: 0, receita: 0 }
+  for (const p of pedidos) {
+    const cur = map.get(p.category) ?? { vendas: 0, receita: 0 }
     cur.vendas += 1
-    cur.receita += o.value
-    map.set(o.category, cur)
+    cur.receita += p.value
+    map.set(p.category, cur)
   }
   return Array.from(map.entries())
     .map(([categoria, { vendas, receita }]) => ({ categoria, vendas, receita }))
     .sort((a, b) => b.vendas - a.vendas)
-}
-
-const STATUS_LABEL: Record<OrderStatus, { label: string; cls: string }> = {
-  novo:      { label: 'Novo',        cls: 'badge badge-blue' },
-  andamento: { label: 'Em andamento',cls: 'badge badge-orange' },
-  fechado:   { label: 'Fechado',     cls: 'badge badge-green' },
 }
 
 const CHART_COLORS = ['#c8a55c', '#4d8af5', '#5fb85a', '#9d6fdb', '#ed8936', '#d65656', '#4ea5b8']
@@ -96,30 +115,25 @@ function ChartTooltip({ active, payload, label, fmt }: TooltipProps) {
 }
 
 export default function PedidosPage() {
-  const { orders, loading, source } = useCrm()
-  const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all')
+  const { leads, loading, source } = useCrm()
   const [page, setPage] = useState(0)
   const PAGE_SIZE = 8
 
-  const filtered = useMemo(
-    () => orders.filter(o => statusFilter === 'all' || o.status === statusFilter),
-    [orders, statusFilter]
+  const pedidos = useMemo(
+    () => leads.filter(l => l.stage === 'fechado').map(leadToPedido),
+    [leads]
   )
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const visible = filtered.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE)
 
-  const totalRevenue = orders.reduce((s, o) => s + o.value, 0)
-  const closedCount = orders.filter(o => o.status === 'fechado').length
-  const newCount = orders.filter(o => o.status === 'novo').length
-  const closedOrders = orders.filter(o => o.status === 'fechado')
-  const ticketMedio = closedOrders.length > 0 ? closedOrders.reduce((s, o) => s + o.value, 0) / closedOrders.length : 0
+  const pageCount = Math.max(1, Math.ceil(pedidos.length / PAGE_SIZE))
+  const visible = pedidos.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE)
 
-  // Receita por mês (últimos 6 meses) — derivado de orders
-  const monthlyRevenue = useMemo(() => buildMonthlyRevenue(orders), [orders])
-  // Pedidos por estado — derivado
-  const ordersByState = useMemo(() => buildOrdersByState(orders), [orders])
-  // Vendas por categoria — derivado
-  const salesByCategory = useMemo(() => buildSalesByCategory(orders), [orders])
+  const totalRevenue = pedidos.reduce((s, p) => s + p.value, 0)
+  const ticketMedio = pedidos.length > 0 ? totalRevenue / pedidos.length : 0
+  const totalLeadsAtivos = leads.filter(l => l.stage !== 'fechado' && l.stage !== 'perdido').length
+
+  const monthlyRevenue   = useMemo(() => buildMonthlyRevenue(pedidos),   [pedidos])
+  const ordersByState    = useMemo(() => buildOrdersByState(pedidos),    [pedidos])
+  const salesByCategory  = useMemo(() => buildSalesByCategory(pedidos),  [pedidos])
 
   if (loading) return (
     <div className="fade-in" style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)' }}>
@@ -138,19 +152,19 @@ export default function PedidosPage() {
 
       {/* KPIs */}
       <div className="stagger" style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 28 }}>
-        <KpiCard icon="💰" label="Receita total" value={fmtBRL(totalRevenue)} sub="período acumulado" color="var(--gold)" />
-        <KpiCard icon="📦" label="Pedidos no período" value={fmtNum(orders.length)} sub={`${newCount} novos · ${closedCount} fechados`} color="var(--trust-blue)" />
-        <KpiCard icon="🧾" label="Ticket médio" value={ticketMedio > 0 ? fmtBRL(ticketMedio) : '—'} sub={ticketMedio > 0 ? 'por pedido fechado' : 'sem pedidos fechados'} color="var(--purple)" />
+        <KpiCard icon="💰" label="Receita total"   value={fmtBRL(totalRevenue)} sub="vendas fechadas" color="var(--gold)" />
+        <KpiCard icon="✅" label="Vendas fechadas" value={fmtNum(pedidos.length)} sub={`${totalLeadsAtivos} leads ativos no pipeline`} color="var(--trust-green)" />
+        <KpiCard icon="🧾" label="Ticket médio"   value={ticketMedio > 0 ? fmtBRL(ticketMedio) : '—'} sub={ticketMedio > 0 ? 'por venda' : 'sem vendas ainda'} color="var(--purple)" />
       </div>
 
-      {orders.length === 0 ? (
+      {pedidos.length === 0 ? (
         <div className="glass" style={{ padding: '60px 24px', textAlign: 'center', marginBottom: 24 }}>
-          <div style={{ fontSize: 48, marginBottom: 12 }} aria-hidden="true">📦</div>
+          <div style={{ fontSize: 48, marginBottom: 12 }} aria-hidden="true">✅</div>
           <div style={{ fontFamily: "'Manrope','Rubik',sans-serif", fontWeight: 700, fontSize: 17, color: 'var(--text)', marginBottom: 6, letterSpacing: '-0.01em' }}>
-            Nenhum pedido cadastrado ainda
+            Nenhuma venda fechada ainda
           </div>
-          <div style={{ fontSize: 13, color: 'var(--text-muted)', maxWidth: 420, margin: '0 auto' }}>
-            Os gráficos e métricas serão preenchidos automaticamente conforme os pedidos forem registrados no Supabase.
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', maxWidth: 460, margin: '0 auto' }}>
+            Quando um lead for movido para a coluna <strong>Fechado</strong> no kanban do CRM, ele aparece aqui automaticamente.
           </div>
         </div>
       ) : <>
@@ -227,47 +241,29 @@ export default function PedidosPage() {
       </div>
       </>}
 
-      {/* Tabela de pedidos */}
+      {/* Tabela de vendas fechadas */}
       <div className="glass" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', borderBottom: '1px solid var(--glass-border)', flexWrap: 'wrap', gap: 10 }}>
           <div className="font-display" style={{ fontWeight: 700, fontSize: 12, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-            Pedidos Recentes <span className="tabular" style={{ color: 'var(--text-muted)', fontWeight: 500, fontSize: 12, textTransform: 'none', letterSpacing: 0, marginLeft: 4 }}>({filtered.length})</span>
+            Vendas Fechadas <span className="tabular" style={{ color: 'var(--text-muted)', fontWeight: 500, fontSize: 12, textTransform: 'none', letterSpacing: 0, marginLeft: 4 }}>({pedidos.length})</span>
           </div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {([
-              { k: 'all',       l: 'Todos' },
-              { k: 'novo',      l: 'Novos' },
-              { k: 'andamento', l: 'Em andamento' },
-              { k: 'fechado',   l: 'Fechados' },
-            ] as const).map(f => (
-              <button
-                key={f.k}
-                type="button"
-                onClick={() => { setStatusFilter(f.k); setPage(0) }}
-                className="btn-secondary"
-                style={statusFilter === f.k ? { background: 'var(--gold)', color: '#1a1500', borderColor: 'var(--gold)', fontWeight: 700 } : undefined}
-              >
-                {f.l}
-              </button>
-            ))}
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => exportToCsv(`pedidos_${todayStamp()}.csv`, filtered, [
-                { key: 'client',   label: 'Cliente' },
-                { key: 'product',  label: 'Produto' },
-                { key: 'category', label: 'Categoria' },
-                { key: 'state',    label: 'Estado' },
-                { key: 'value',    label: 'Valor (R$)' },
-                { key: 'status',   label: 'Status' },
-                { key: 'date',     label: 'Data' },
-              ])}
-              disabled={filtered.length === 0}
-              title="Exportar CSV"
-            >
-              ⬇ CSV
-            </button>
-          </div>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => exportToCsv(`vendas_${todayStamp()}.csv`, pedidos, [
+              { key: 'client',         label: 'Cliente' },
+              { key: 'product',        label: 'Produtos' },
+              { key: 'category',       label: 'Categoria' },
+              { key: 'state',          label: 'Estado' },
+              { key: 'value',          label: 'Valor total (R$)' },
+              { key: 'createdByName',  label: 'Cadastrado por', format: p => p.createdByName ?? '' },
+              { key: 'date',           label: 'Data',           format: p => new Date(p.date).toLocaleDateString('pt-BR') },
+            ])}
+            disabled={pedidos.length === 0}
+            title="Exportar CSV"
+          >
+            ⬇ CSV
+          </button>
         </div>
         <div style={{ overflowX: 'auto' }}>
           <table className="data-table">
@@ -277,23 +273,23 @@ export default function PedidosPage() {
                 <th>Produto</th>
                 <th>Estado</th>
                 <th className="num">Valor</th>
-                <th>Status</th>
+                <th>Cadastrado por</th>
                 <th>Data</th>
               </tr>
             </thead>
             <tbody>
-              {visible.map(o => (
-                <tr key={o.id}>
-                  <td style={{ fontWeight: 600, color: 'var(--text)' }}>{o.client}</td>
-                  <td style={{ color: 'var(--text-muted)' }}>{o.product}</td>
-                  <td>{o.state}</td>
-                  <td className="num" style={{ fontWeight: 600 }}>{fmtBRL(o.value)}</td>
-                  <td><span className={STATUS_LABEL[o.status].cls}>{STATUS_LABEL[o.status].label}</span></td>
-                  <td style={{ color: 'var(--text-muted)' }}>{new Date(o.date).toLocaleDateString('pt-BR')}</td>
+              {visible.map(p => (
+                <tr key={p.id}>
+                  <td style={{ fontWeight: 600, color: 'var(--text)' }}>{p.client}</td>
+                  <td style={{ color: 'var(--text-muted)' }}>{p.product}</td>
+                  <td>{p.state}</td>
+                  <td className="num" style={{ fontWeight: 600 }}>{fmtBRL(p.value)}</td>
+                  <td style={{ color: 'var(--text-muted)' }}>{p.createdByName ?? '—'}</td>
+                  <td style={{ color: 'var(--text-muted)' }}>{new Date(p.date).toLocaleDateString('pt-BR')}</td>
                 </tr>
               ))}
               {visible.length === 0 && (
-                <tr><td colSpan={6} style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>Nenhum pedido com esse filtro.</td></tr>
+                <tr><td colSpan={6} style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>Nenhuma venda fechada ainda.</td></tr>
               )}
             </tbody>
           </table>

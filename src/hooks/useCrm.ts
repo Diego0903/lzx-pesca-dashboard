@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import type { Lead, LeadItem, Interaction, Order, LeadStage, ProductCategory } from '../data/mockCrm'
+import type { Lead, LeadItem, Interaction, LeadStage, ProductCategory } from '../data/mockCrm'
 
 // ── Row shapes que vêm do Supabase (snake_case) ────────────────
 interface LeadRow {
@@ -33,18 +33,6 @@ interface InteractionRow {
   type: string
   occurred_at: string
   note: string | null
-}
-
-interface OrderRow {
-  id: string
-  lead_id: string | null
-  client: string
-  product: string
-  category: string | null
-  state: string | null
-  value: number
-  status: string
-  ordered_at: string
 }
 
 // ── Mappers row → app type ─────────────────────────────────────
@@ -106,22 +94,10 @@ const mapInteraction = (r: InteractionRow): Interaction => ({
   note: r.note ?? '',
 })
 
-const mapOrder = (r: OrderRow): Order => ({
-  id: r.id,
-  client: r.client,
-  product: r.product,
-  category: (r.category as Order['category']) ?? 'Redes',
-  state: (r.state as Order['state']) ?? 'Outros',
-  value: Number(r.value),
-  status: r.status as Order['status'],
-  date: r.ordered_at,
-})
-
 // ── Hook principal ─────────────────────────────────────────────
 export interface UseCrmResult {
   leads: Lead[]
   interactions: Interaction[]
-  orders: Order[]
   loading: boolean
   error: string | null
   source: 'supabase' | 'offline'
@@ -135,7 +111,6 @@ export interface UseCrmResult {
 export function useCrm(): UseCrmResult {
   const [leads, setLeads] = useState<Lead[]>([])
   const [interactions, setInteractions] = useState<Interaction[]>([])
-  const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [source, setSource] = useState<'supabase' | 'offline'>('offline')
@@ -144,7 +119,7 @@ export function useCrm(): UseCrmResult {
     setLoading(true)
     setError(null)
     if (!supabase) {
-      setLeads([]); setInteractions([]); setOrders([])
+      setLeads([]); setInteractions([])
       setSource('offline')
       setError('Supabase não configurado')
       setLoading(false)
@@ -152,20 +127,16 @@ export function useCrm(): UseCrmResult {
     }
     const sb = supabase
     try {
-      // ── 1) Busca leads, interactions e orders em paralelo ──
-      // Importante: não usamos embed PostgREST aqui (creator:usuarios!fk)
-      // porque já tivemos travamentos misteriosos. Fazemos o join em JS.
-      const [leadsRes, intRes, ordRes] = await Promise.all([
+      // Não usamos embed PostgREST (creator:usuarios!fk) aqui por causa de
+      // travamentos misteriosos no schema cache — fazemos o join em JS abaixo.
+      const [leadsRes, intRes] = await Promise.all([
         sb.from('leads').select('*').order('last_contact_at', { ascending: false }),
         sb.from('interactions').select('*').order('occurred_at', { ascending: false }),
-        sb.from('orders').select('*').order('ordered_at', { ascending: false }),
       ])
       if (leadsRes.error) throw leadsRes.error
       if (intRes.error)   throw intRes.error
-      if (ordRes.error)   throw ordRes.error
 
-      // ── 2) Resolve nomes dos criadores via segunda query ──
-      // (RLS garante que admin/dono leem todos; funcionário só lê o próprio)
+      // Resolve nomes dos criadores em uma query batch (.in)
       const creatorIds = Array.from(new Set(
         (leadsRes.data ?? [])
           .map(l => l.created_by)
@@ -184,7 +155,6 @@ export function useCrm(): UseCrmResult {
         }
       }
 
-      // ── 3) Aplica o nome do criador no row antes de mapear ──
       const leadsWithCreator = (leadsRes.data ?? []).map(l => ({
         ...l,
         creator: l.created_by ? { nome: creatorMap.get(l.created_by) ?? '' } : null,
@@ -192,11 +162,10 @@ export function useCrm(): UseCrmResult {
 
       setLeads(leadsWithCreator.map(mapLead))
       setInteractions((intRes.data ?? []).map(mapInteraction))
-      setOrders((ordRes.data ?? []).map(mapOrder))
       setSource('supabase')
     } catch (e) {
       console.warn('[useCrm] Supabase fetch failed:', e)
-      setLeads([]); setInteractions([]); setOrders([])
+      setLeads([]); setInteractions([])
       setSource('offline')
       setError(e instanceof Error ? e.message : 'Falha ao carregar dados')
     } finally {
@@ -204,7 +173,34 @@ export function useCrm(): UseCrmResult {
     }
   }, [])
 
+  // Mantém a referência atual do `load` num ref pra permitir que o efeito de
+  // realtime tenha deps `[]` — assim o canal é criado uma única vez por hook,
+  // sem teardown/recreate a cada re-render.
+  const loadRef = useRef(load)
+  useEffect(() => { loadRef.current = load }, [load])
+
   useEffect(() => { load() }, [load])
+
+  // Supabase Realtime — coalesce vários eventos próximos numa única refetch
+  // pra evitar storm de requests quando há batch update no banco.
+  useEffect(() => {
+    if (!supabase) return
+    const sb = supabase
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const debouncedReload = () => {
+      if (timer) return
+      timer = setTimeout(() => { timer = null; loadRef.current() }, 250)
+    }
+    const channel = sb
+      .channel('crm-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' },        debouncedReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'interactions' }, debouncedReload)
+      .subscribe()
+    return () => {
+      if (timer) clearTimeout(timer)
+      sb.removeChannel(channel)
+    }
+  }, [])
 
   const createLead: UseCrmResult['createLead'] = useCallback(async (lead) => {
     if (!supabase) {
@@ -302,7 +298,7 @@ export function useCrm(): UseCrmResult {
   }, [])
 
   return {
-    leads, interactions, orders, loading, error, source,
+    leads, interactions, loading, error, source,
     reload: load, createLead, moveLeadStage, addInteraction, deleteLead,
   }
 }

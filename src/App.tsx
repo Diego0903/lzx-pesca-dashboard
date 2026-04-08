@@ -45,6 +45,8 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'ads' | 'instagram'>('ads')
   const [igUserId, setIgUserId] = useState<string>('')
   const [showReportMenu, setShowReportMenu] = useState(false)
+  const [reportType, setReportType] = useState<'ads' | 'instagram' | 'all'>('ads')
+  const [reportMode, setReportMode] = useState<'technical' | 'executive'>('technical')
 
   // Verifica token ao montar
   useEffect(() => {
@@ -101,7 +103,7 @@ export default function App() {
     if (selectedAccount) loadAccountData(selectedAccount, dateRange)
   }, [selectedAccount, dateRange, loadAccountData])
 
-  const handleGenerateReport = async (type: 'ads' | 'instagram' | 'all') => {
+  const handleGenerateReport = async () => {
     setShowReportMenu(false)
     setGeneratingReport(true)
     try {
@@ -109,8 +111,9 @@ export default function App() {
         selectedAccount,
         dateRange.since || undefined,
         dateRange.until || undefined,
-        type,
+        reportType,
         igUserId || undefined,
+        reportMode,
       )
       setReportContent(res.report)
       setShowReport(true)
@@ -184,22 +187,37 @@ export default function App() {
               {showReportMenu && (
                 <>
                   <div style={{ position: 'fixed', inset: 0, zIndex: 199 }} onClick={() => setShowReportMenu(false)} />
-                  <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 200, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', minWidth: 210, boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}>
-                    {([
-                      { key: 'ads', label: '📊 Apenas Meta Ads' },
-                      { key: 'instagram', label: '📸 Apenas Instagram' },
-                      { key: 'all', label: '📋 Meta Ads + Instagram' },
-                    ] as const).map(opt => (
-                      <button
-                        key={opt.key}
-                        onClick={() => handleGenerateReport(opt.key)}
-                        style={{ display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 'none', borderBottom: '1px solid var(--border)', padding: '12px 16px', color: 'var(--text)', cursor: 'pointer', fontSize: 13, fontWeight: 500 }}
-                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface2)')}
-                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
+                  <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 200, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, width: 260, boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+                    {/* Tipo */}
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Conteúdo</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 14 }}>
+                      {([
+                        { key: 'ads', label: '📊 Apenas Meta Ads' },
+                        { key: 'instagram', label: '📸 Apenas Instagram' },
+                        { key: 'all', label: '📋 Meta Ads + Instagram' },
+                      ] as const).map(opt => (
+                        <button key={opt.key} onClick={() => setReportType(opt.key)} style={{ textAlign: 'left', background: reportType === opt.key ? 'rgba(196,163,90,0.15)' : 'transparent', border: `1px solid ${reportType === opt.key ? 'var(--gold)' : 'var(--border)'}`, borderRadius: 7, padding: '8px 12px', color: reportType === opt.key ? 'var(--gold)' : 'var(--text)', cursor: 'pointer', fontSize: 13, fontWeight: reportType === opt.key ? 600 : 400 }}>
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                    {/* Modo */}
+                    <div style={{ height: 1, background: 'var(--border)', marginBottom: 12 }} />
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Público</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 16 }}>
+                      {([
+                        { key: 'technical', label: '⚙️ Gestor de Tráfego', sub: 'Métricas técnicas e campanhas' },
+                        { key: 'executive', label: '👔 Supervisores', sub: 'Resumo executivo, sem termos técnicos' },
+                      ] as const).map(opt => (
+                        <button key={opt.key} onClick={() => setReportMode(opt.key)} style={{ textAlign: 'left', background: reportMode === opt.key ? 'rgba(196,163,90,0.15)' : 'transparent', border: `1px solid ${reportMode === opt.key ? 'var(--gold)' : 'var(--border)'}`, borderRadius: 7, padding: '8px 12px', color: reportMode === opt.key ? 'var(--gold)' : 'var(--text)', cursor: 'pointer', fontSize: 13, fontWeight: reportMode === opt.key ? 600 : 400 }}>
+                          <div>{opt.label}</div>
+                          <div style={{ fontSize: 11, color: reportMode === opt.key ? 'rgba(196,163,90,0.7)' : 'var(--text-muted)', marginTop: 2 }}>{opt.sub}</div>
+                        </button>
+                      ))}
+                    </div>
+                    <button onClick={handleGenerateReport} style={{ width: '100%', background: 'var(--gold)', border: 'none', borderRadius: 7, padding: '10px', color: '#1a1500', cursor: 'pointer', fontSize: 13, fontWeight: 700, fontFamily: "'Rubik', sans-serif" }}>
+                      Gerar PDF
+                    </button>
                   </div>
                 </>
               )}
@@ -340,7 +358,7 @@ export default function App() {
       </main>
 
       {showReport && (
-        <ReportModal content={reportContent} onClose={() => setShowReport(false)} />
+        <ReportModal content={reportContent} onClose={() => setShowReport(false)} mode={reportMode} />
       )}
     </div>
   )

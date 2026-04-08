@@ -1,6 +1,7 @@
 interface Props {
   content: string
   onClose: () => void
+  mode?: 'technical' | 'executive'
 }
 
 function markdownToHtml(md: string): string {
@@ -55,7 +56,7 @@ function inlineFormat(text: string): string {
     .replace(/`(.+?)`/g, '<code>$1</code>')
 }
 
-export default function ReportModal({ content, onClose }: Props) {
+export default function ReportModal({ content, onClose, mode }: Props) {
   const handleCopy = () => navigator.clipboard.writeText(content)
 
   const handleDownloadPDF = () => {
@@ -153,7 +154,9 @@ export default function ReportModal({ content, onClose }: Props) {
         maxHeight: '85vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
       }} onClick={e => e.stopPropagation()}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontWeight: 700, fontSize: 15 }}>📄 Relatório de Análise</div>
+          <div style={{ fontWeight: 700, fontSize: 15 }}>
+            📄 {mode === 'executive' ? 'Relatório Executivo' : 'Relatório Técnico'}
+          </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={handleCopy} style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 12px', color: 'var(--text)', cursor: 'pointer', fontSize: 13 }}>
               📋 Copiar

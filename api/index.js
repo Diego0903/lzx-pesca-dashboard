@@ -169,14 +169,18 @@ app.get('/api/instagram/stories/:igUserId', async (req, res) => {
 })
 
 app.post('/api/generate-report', async (req, res) => {
-  const { accountId, since, until, type = 'ads', igUserId } = req.body
+  const { accountId, since, until, type = 'ads', igUserId, mode = 'technical' } = req.body
   const dateParam = since && until ? { time_range: JSON.stringify({ since, until }) } : { date_preset: 'maximum' }
   const period = since && until ? `${since} até ${until}` : 'Todo o histórico'
   const now = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
+  const isTech = mode === 'technical'
+  const toTs = (d, end = false) => d ? Math.floor(new Date(d + (end ? 'T23:59:59' : 'T00:00:00')).getTime() / 1000) : undefined
 
   try {
-    let report = `# Relatório LZX Pesca\n**Gerado em:** ${now}  \n**Período:** ${period}\n\n---\n\n`
+    const modeLabel = isTech ? 'Gestor de Tráfego' : 'Relatório Executivo'
+    let report = `# ${modeLabel} — LZX Pesca\n**Gerado em:** ${now}  \n**Período:** ${period}\n\n---\n\n`
 
+    // ── META ADS ──────────────────────────────────────────────────
     if (type === 'ads' || type === 'all') {
       const [accRes, campRes] = await Promise.all([
         metaFetch(accountId, { fields: 'name,currency,amount_spent' }),
@@ -193,41 +197,83 @@ app.post('/api/generate-report', async (req, res) => {
         acc.reach += parseInt(c.reach || '0')
         const msgs = (c.actions || []).filter(a => a.action_type.includes('messaging')).reduce((s, a) => s + parseFloat(a.value), 0)
         acc.msgs += msgs
+        const purchases = (c.actions || []).filter(a => a.action_type === 'purchase').reduce((s, a) => s + parseFloat(a.value), 0)
+        acc.purchases += purchases
         return acc
-      }, { spend: 0, impressions: 0, clicks: 0, reach: 0, msgs: 0 })
-      const ctr = totals.impressions > 0 ? (totals.clicks / totals.impressions * 100).toFixed(2) : '0.00'
-      const cpc = totals.clicks > 0 ? (totals.spend / totals.clicks).toFixed(2) : '0.00'
+      }, { spend: 0, impressions: 0, clicks: 0, reach: 0, msgs: 0, purchases: 0 })
+      const ctr = totals.impressions > 0 ? (totals.clicks / totals.impressions * 100) : 0
+      const cpc = totals.clicks > 0 ? (totals.spend / totals.clicks) : 0
+      const cpm = totals.impressions > 0 ? (totals.spend / totals.impressions * 1000) : 0
 
-      report += `## 📊 Meta Ads — ${accRes.name || accountId}\n\n`
-      report += `### Consolidado\n`
-      report += `| Métrica | Valor |\n|---|---|\n`
-      report += `| 💰 Total Investido | R$ ${totals.spend.toFixed(2)} |\n`
-      report += `| 👁️ Impressões | ${totals.impressions.toLocaleString('pt-BR')} |\n`
-      report += `| 🖱️ Cliques | ${totals.clicks.toLocaleString('pt-BR')} |\n`
-      report += `| 📡 Alcance | ${totals.reach.toLocaleString('pt-BR')} |\n`
-      report += `| 📊 CTR Médio | ${ctr}% |\n`
-      report += `| 💳 CPC Médio | R$ ${cpc} |\n`
-      if (totals.msgs > 0) report += `| 💬 Conversas WhatsApp | ${totals.msgs.toFixed(0)} |\n`
-      report += `\n### Campanhas\n`
-      for (const c of camps) {
-        const spend = parseFloat(c.spend || '0')
-        if (spend === 0) continue
-        const ctrC = parseFloat(c.ctr || '0').toFixed(2)
-        const cpcC = parseFloat(c.cpc || '0').toFixed(2)
-        const roas = c.purchase_roas?.[0]?.value ? parseFloat(c.purchase_roas[0].value).toFixed(2) : null
-        report += `\n**${c.campaign_name}**\n`
-        report += `- Gasto: R$ ${spend.toFixed(2)} | Impressões: ${parseInt(c.impressions || '0').toLocaleString('pt-BR')} | Cliques: ${c.clicks} | CTR: ${ctrC}% | CPC: R$ ${cpcC}`
-        if (roas) report += ` | ROAS: ${roas}x`
+      if (isTech) {
+        // ── Técnico: todas as métricas + campanhas detalhadas ──
+        report += `## 📊 Meta Ads — ${accRes.name || accountId}\n\n`
+        report += `### Consolidado\n`
+        report += `| Métrica | Valor |\n|---|---|\n`
+        report += `| 💰 Total Investido | R$ ${totals.spend.toFixed(2)} |\n`
+        report += `| 👁️ Impressões | ${totals.impressions.toLocaleString('pt-BR')} |\n`
+        report += `| 🖱️ Cliques | ${totals.clicks.toLocaleString('pt-BR')} |\n`
+        report += `| 📡 Alcance | ${totals.reach.toLocaleString('pt-BR')} |\n`
+        report += `| 📊 CTR Médio | ${ctr.toFixed(2)}% |\n`
+        report += `| 💳 CPC Médio | R$ ${cpc.toFixed(2)} |\n`
+        report += `| 📣 CPM Médio | R$ ${cpm.toFixed(2)} |\n`
+        if (totals.msgs > 0) report += `| 💬 Conversas WhatsApp | ${totals.msgs.toFixed(0)} |\n`
+        if (totals.purchases > 0) report += `| 🛒 Compras | ${totals.purchases.toFixed(0)} |\n`
+
+        const activeCamps = camps.filter(c => parseFloat(c.spend || '0') > 0)
+        if (activeCamps.length > 0) {
+          report += `\n### Campanhas (${activeCamps.length} com gasto)\n`
+          report += `| Campanha | Gasto | Impressões | Cliques | CTR | CPC | CPM | ROAS |\n`
+          report += `|---|---|---|---|---|---|---|---|\n`
+          for (const c of activeCamps) {
+            const sp = parseFloat(c.spend || '0')
+            const ctrC = parseFloat(c.ctr || '0').toFixed(2)
+            const cpcC = parseFloat(c.cpc || '0').toFixed(2)
+            const cpmC = parseFloat(c.cpm || '0').toFixed(2)
+            const roas = c.purchase_roas?.[0]?.value ? parseFloat(c.purchase_roas[0].value).toFixed(2) + 'x' : '—'
+            const imp = parseInt(c.impressions || '0').toLocaleString('pt-BR')
+            report += `| ${c.campaign_name} | R$ ${sp.toFixed(2)} | ${imp} | ${c.clicks} | ${ctrC}% | R$ ${cpcC} | R$ ${cpmC} | ${roas} |\n`
+          }
+        }
         report += '\n'
+      } else {
+        // ── Executivo: linguagem simples, só o essencial ──
+        const perfLabel = ctr >= 2 ? '✅ Bom desempenho' : ctr >= 1 ? '🟡 Desempenho razoável' : '🔴 Desempenho abaixo do esperado'
+        report += `## 📊 Anúncios no Meta (Facebook e Instagram)\n\n`
+        report += `### Resumo do Período\n`
+        report += `| | |\n|---|---|\n`
+        report += `| 💰 Total investido em anúncios | **R$ ${totals.spend.toFixed(2)}** |\n`
+        report += `| 👥 Pessoas alcançadas | **${totals.reach.toLocaleString('pt-BR')}** |\n`
+        report += `| 👁️ Vezes que o anúncio foi visto | **${totals.impressions.toLocaleString('pt-BR')}** |\n`
+        report += `| 🖱️ Pessoas que clicaram | **${totals.clicks.toLocaleString('pt-BR')}** |\n`
+        if (totals.msgs > 0) report += `| 💬 Conversas iniciadas no WhatsApp | **${totals.msgs.toFixed(0)}** |\n`
+        if (totals.purchases > 0) report += `| 🛒 Vendas registradas | **${totals.purchases.toFixed(0)}** |\n`
+        report += `\n### Avaliação Geral\n`
+        report += `${perfLabel}\n\n`
+        if (totals.msgs > 0 && totals.spend > 0) {
+          const cpp = (totals.spend / totals.msgs).toFixed(2)
+          report += `Cada conversa no WhatsApp custou em média **R$ ${cpp}**.\n\n`
+        }
+        const activeCamps = camps.filter(c => parseFloat(c.spend || '0') > 0)
+        if (activeCamps.length > 0) {
+          report += `### Campanhas Ativas (${activeCamps.length})\n`
+          for (const c of activeCamps) {
+            const sp = parseFloat(c.spend || '0')
+            const msgs = (c.actions || []).filter(a => a.action_type.includes('messaging')).reduce((s, a) => s + parseFloat(a.value), 0)
+            report += `- **${c.campaign_name}** — R$ ${sp.toFixed(2)} investido`
+            if (msgs > 0) report += `, ${msgs.toFixed(0)} conversas`
+            report += '\n'
+          }
+          report += '\n'
+        }
       }
-      report += '\n'
     }
 
+    // ── INSTAGRAM ────────────────────────────────────────────────
     if (type === 'instagram' || type === 'all') {
       if (!igUserId) {
-        report += `## 📸 Instagram\n\n_ID da conta Instagram não informado._\n\n`
+        report += `## 📸 Instagram\n\n_Acesse a aba Instagram no dashboard e atualize para incluir esses dados._\n\n`
       } else {
-        const toTs = (d, end = false) => d ? Math.floor(new Date(d + (end ? 'T23:59:59' : 'T00:00:00')).getTime() / 1000) : undefined
         const [prof, ins, med] = await Promise.all([
           metaFetch(igUserId, { fields: 'username,followers_count,follows_count,media_count' }),
           metaFetch(`${igUserId}/insights`, {
@@ -242,17 +288,32 @@ app.post('/api/generate-report', async (req, res) => {
         const sumIg = name => insArr.find(i => i.name === name)?.values.reduce((s, v) => s + v.value, 0) ?? 0
         const totalLikes = (med.data || []).reduce((s, m) => s + m.like_count, 0)
         const totalComments = (med.data || []).reduce((s, m) => s + m.comments_count, 0)
+        const followers = prof.followers_count || 0
+        const newFollowers = sumIg('follower_count')
 
-        report += `## 📸 Instagram — @${prof.username}\n\n`
-        report += `| Métrica | Valor |\n|---|---|\n`
-        report += `| 👥 Seguidores | ${(prof.followers_count || 0).toLocaleString('pt-BR')} |\n`
-        report += `| ➕ Novos Seguidores | ${sumIg('follower_count').toLocaleString('pt-BR')} |\n`
-        report += `| 📡 Alcance | ${sumIg('reach').toLocaleString('pt-BR')} |\n`
-        report += `| 👁️ Impressões | ${sumIg('impressions').toLocaleString('pt-BR')} |\n`
-        report += `| 🔍 Visitas ao Perfil | ${sumIg('profile_views').toLocaleString('pt-BR')} |\n`
-        report += `| 🔗 Cliques no Site | ${sumIg('website_clicks').toLocaleString('pt-BR')} |\n`
-        report += `| ❤️ Curtidas (posts recentes) | ${totalLikes.toLocaleString('pt-BR')} |\n`
-        report += `| 💬 Comentários | ${totalComments.toLocaleString('pt-BR')} |\n`
+        if (isTech) {
+          report += `## 📸 Instagram — @${prof.username}\n\n`
+          report += `| Métrica | Valor |\n|---|---|\n`
+          report += `| 👥 Total de Seguidores | ${followers.toLocaleString('pt-BR')} |\n`
+          report += `| ➕ Novos Seguidores no Período | ${newFollowers.toLocaleString('pt-BR')} |\n`
+          report += `| 📡 Alcance | ${sumIg('reach').toLocaleString('pt-BR')} |\n`
+          report += `| 👁️ Impressões | ${sumIg('impressions').toLocaleString('pt-BR')} |\n`
+          report += `| 🔍 Visitas ao Perfil | ${sumIg('profile_views').toLocaleString('pt-BR')} |\n`
+          report += `| 🔗 Cliques no Link da Bio | ${sumIg('website_clicks').toLocaleString('pt-BR')} |\n`
+          report += `| ❤️ Curtidas (posts recentes) | ${totalLikes.toLocaleString('pt-BR')} |\n`
+          report += `| 💬 Comentários | ${totalComments.toLocaleString('pt-BR')} |\n`
+        } else {
+          report += `## 📸 Instagram (@${prof.username})\n\n`
+          report += `### Resumo do Período\n`
+          report += `| | |\n|---|---|\n`
+          report += `| 👥 Total de seguidores | **${followers.toLocaleString('pt-BR')}** |\n`
+          if (newFollowers > 0) report += `| ➕ Seguidores novos no período | **+${newFollowers.toLocaleString('pt-BR')}** |\n`
+          report += `| 👁️ Pessoas que viram o perfil | **${sumIg('reach').toLocaleString('pt-BR')}** |\n`
+          report += `| 🔍 Visitas à página do perfil | **${sumIg('profile_views').toLocaleString('pt-BR')}** |\n`
+          if (sumIg('website_clicks') > 0) report += `| 🔗 Cliques no link da bio | **${sumIg('website_clicks').toLocaleString('pt-BR')}** |\n`
+          report += `| ❤️ Curtidas nos posts | **${totalLikes.toLocaleString('pt-BR')}** |\n`
+          report += `| 💬 Comentários nos posts | **${totalComments.toLocaleString('pt-BR')}** |\n`
+        }
         report += '\n'
       }
     }

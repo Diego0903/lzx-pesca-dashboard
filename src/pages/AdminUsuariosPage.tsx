@@ -51,7 +51,7 @@ function fmtDate(iso: string | null) {
 
 export default function AdminUsuariosPage() {
   const { user, usuario } = useAuth()
-  const { loading, error, pendentes, ativos, rejeitados, aprovar, rejeitar, desativar, reativar, alterarPerfil, resetSenha } = useUsuarios(usuario)
+  const { loading, error, pendentes, ativos, rejeitados, aprovar, rejeitar, desativar, reativar, alterarPerfil, resetSenha } = useUsuarios(usuario ?? null)
   const [tab, setTab] = useState<Tab>('pendentes')
   const [approveModal, setApproveModal] = useState<UsuarioRow | null>(null)
   const [approvePerfil, setApprovePerfil] = useState<'admin' | 'funcionario'>('funcionario')

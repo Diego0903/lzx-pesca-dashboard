@@ -47,6 +47,15 @@ export default function App() {
   const [showReportMenu, setShowReportMenu] = useState(false)
   const [reportType, setReportType] = useState<'ads' | 'instagram' | 'all'>('ads')
   const [reportMode, setReportMode] = useState<'technical' | 'executive'>('technical')
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    return (localStorage.getItem('lzx-theme') as 'dark' | 'light') || 'dark'
+  })
+
+  // Aplica tema
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme === 'light' ? 'light' : '')
+    localStorage.setItem('lzx-theme', theme)
+  }, [theme])
 
   // Verifica token ao montar
   useEffect(() => {
@@ -179,6 +188,25 @@ export default function App() {
               ● <span className="report-btn-label">{tokenInfo.is_valid ? 'Conectado' : 'Desconectado'}</span>
             </span>
           )}
+          <button
+            onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
+            title={theme === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
+            style={{
+              background: 'var(--surface2)',
+              border: '1px solid var(--border)',
+              borderRadius: 7,
+              width: 34,
+              height: 34,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              fontSize: 16,
+              flexShrink: 0,
+            }}
+          >
+            {theme === 'dark' ? '☀️' : '🌙'}
+          </button>
           {hasAdsAccess && (
             <DateFilter value={dateRange} onChange={setDateRange} />
           )}

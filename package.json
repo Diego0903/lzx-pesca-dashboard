@@ -10,6 +10,7 @@
     "fetch-data": "node scripts/fetchData.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
     "axios": "^1.7.2",
     "date-fns": "^3.6.0",
     "lucide-react": "^0.400.0",

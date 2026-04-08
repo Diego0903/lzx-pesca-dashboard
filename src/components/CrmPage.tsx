@@ -3,9 +3,10 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import {
-  mockLeads, mockInteractions, leadsBySource, closeRateByCategory,
+  leadsBySource, closeRateByCategory,
   type Lead, type LeadStage, type LeadOrigin, type ContactType, type Interaction, type ProductCategory, type BrazilState,
 } from '../data/mockCrm'
+import { useCrm } from '../hooks/useCrm'
 import { fmtBRL, fmtNum } from '../utils/formatters'
 
 const STAGES: { key: LeadStage; label: string; color: string }[] = [
@@ -416,39 +417,51 @@ function MiniDashboard({ leads }: { leads: Lead[] }) {
 }
 
 export default function CrmPage() {
-  const [leads, setLeads] = useState<Lead[]>(mockLeads)
-  const [interactions, setInteractions] = useState<Interaction[]>(mockInteractions)
-  const [selected, setSelected] = useState<Lead | null>(mockLeads[0] ?? null)
+  const { leads, interactions, loading, error, source, createLead, moveLeadStage, addInteraction } = useCrm()
+  const [selected, setSelected] = useState<Lead | null>(null)
 
-  const moveLead = (leadId: string, to: LeadStage) => {
-    setLeads(prev => prev.map(l => l.id === leadId ? { ...l, stage: to, lastContactAt: new Date().toISOString() } : l))
+  // Pick a default selected lead once data lands
+  const effectiveSelected = selected ?? leads[0] ?? null
+
+  const handleCreate = (lead: Lead) => {
+    // Drop the locally-generated id; Supabase assigns its own UUID
+    const { id, ...payload } = lead
+    void id
+    void createLead(payload)
   }
-  const addInteraction = (i: Omit<Interaction, 'id'>) => {
-    setInteractions(prev => [{ id: `i${Date.now()}`, ...i }, ...prev])
-    setLeads(prev => prev.map(l => l.id === i.leadId ? { ...l, lastContactAt: i.date } : l))
-  }
-  const createLead = (lead: Lead) => {
-    setLeads(prev => [lead, ...prev])
-    setSelected(lead)
-  }
+
+  if (loading) return (
+    <div className="fade-in" style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)' }}>
+      <div style={{ fontSize: 32, marginBottom: 12 }}>⏳</div>
+      Carregando dados do CRM...
+    </div>
+  )
 
   return (
     <div className="fade-in">
+      {/* Source banner */}
+      <div style={{ marginBottom: 16, fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span className={`badge ${source === 'supabase' ? 'badge-green' : 'badge-orange'}`}>
+          {source === 'supabase' ? '🟢 Supabase conectado' : '🟡 Modo offline (dados de exemplo)'}
+        </span>
+        {error && <span style={{ color: 'var(--trust-red)' }}>· {error}</span>}
+      </div>
+
       <MiniDashboard leads={leads} />
 
       <div style={{ marginBottom: 20 }}>
         <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 700, fontSize: 14, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>
           Pipeline de Vendas
         </div>
-        <Kanban leads={leads} onMove={moveLead} onSelect={setSelected} selectedId={selected?.id} />
+        <Kanban leads={leads} onMove={(id, to) => void moveLeadStage(id, to)} onSelect={setSelected} selectedId={effectiveSelected?.id} />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 16, marginBottom: 20 }}>
         <ClientList leads={leads} onSelect={setSelected} />
-        <InteractionTimeline lead={selected} interactions={interactions} onAdd={addInteraction} />
+        <InteractionTimeline lead={effectiveSelected} interactions={interactions} onAdd={(i) => void addInteraction(i)} />
       </div>
 
-      <NewLeadForm onCreate={createLead} />
+      <NewLeadForm onCreate={handleCreate} />
     </div>
   )
 }

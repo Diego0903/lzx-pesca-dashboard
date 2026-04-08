@@ -4,9 +4,10 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
 import {
-  mockOrders, monthlyRevenue, salesByCategory, ordersByState,
+  monthlyRevenue, salesByCategory, ordersByState,
   dashboardExtraKpis, type OrderStatus,
 } from '../data/mockCrm'
+import { useCrm } from '../hooks/useCrm'
 import { fmtBRL, fmtNum } from '../utils/formatters'
 
 const STATUS_LABEL: Record<OrderStatus, { label: string; cls: string }> = {
@@ -57,27 +58,41 @@ function ChartTooltip({ active, payload, label, fmt }: TooltipProps) {
 }
 
 export default function PedidosPage() {
+  const { orders, loading, source } = useCrm()
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all')
   const [page, setPage] = useState(0)
   const PAGE_SIZE = 8
 
   const filtered = useMemo(
-    () => mockOrders.filter(o => statusFilter === 'all' || o.status === statusFilter),
-    [statusFilter]
+    () => orders.filter(o => statusFilter === 'all' || o.status === statusFilter),
+    [orders, statusFilter]
   )
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const visible = filtered.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE)
 
-  const totalRevenue = mockOrders.reduce((s, o) => s + o.value, 0)
-  const closedCount = mockOrders.filter(o => o.status === 'fechado').length
-  const newCount = mockOrders.filter(o => o.status === 'novo').length
+  const totalRevenue = orders.reduce((s, o) => s + o.value, 0)
+  const closedCount = orders.filter(o => o.status === 'fechado').length
+  const newCount = orders.filter(o => o.status === 'novo').length
+
+  if (loading) return (
+    <div className="fade-in" style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)' }}>
+      <div style={{ fontSize: 32, marginBottom: 12 }}>⏳</div>
+      Carregando pedidos...
+    </div>
+  )
 
   return (
     <div className="fade-in">
+      <div style={{ marginBottom: 16, fontSize: 11, color: 'var(--text-muted)' }}>
+        <span className={`badge ${source === 'supabase' ? 'badge-green' : 'badge-orange'}`}>
+          {source === 'supabase' ? '🟢 Supabase conectado' : '🟡 Modo offline (dados de exemplo)'}
+        </span>
+      </div>
+
       {/* KPIs */}
       <div className="stagger" style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 28 }}>
         <KpiCard icon="💰" label="Receita total" value={fmtBRL(totalRevenue)} sub="período acumulado" color="var(--gold)" />
-        <KpiCard icon="📦" label="Pedidos no período" value={fmtNum(mockOrders.length)} sub={`${newCount} novos · ${closedCount} fechados`} color="var(--trust-blue)" />
+        <KpiCard icon="📦" label="Pedidos no período" value={fmtNum(orders.length)} sub={`${newCount} novos · ${closedCount} fechados`} color="var(--trust-blue)" />
         <KpiCard icon="🎯" label="Conversão WhatsApp" value={`${dashboardExtraKpis.whatsappConversion}%`} sub="leads que viram pedido" color="var(--trust-green)" />
         <KpiCard icon="🧾" label="Ticket médio" value={fmtBRL(dashboardExtraKpis.ticketMedio)} sub="por pedido fechado" color="var(--purple)" />
         <KpiCard icon="🔥" label="Mais consultado" value={dashboardExtraKpis.topConsultedProduct} sub={`${dashboardExtraKpis.topConsultedCount} consultas esta semana`} color="var(--trust-orange)" />

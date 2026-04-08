@@ -116,11 +116,4 @@ create policy "lzx anon all orders"
   to anon, authenticated
   using (true) with check (true);
 
--- ── SEED inicial (opcional — comente se não quiser dados de exemplo) ──
-insert into public.leads (name, whatsapp, city, state, product, category, estimated_qty, estimated_value, origin, stage, last_contact_at, next_follow_up_at, recurring)
-values
-  ('Marcos Albuquerque',     '(48) 99812-4501', 'Florianópolis','SC','Rede Multifilamento 70mm','Redes',  50, 12500, 'Google',     'novo',        now() - interval '2 days', now() + interval '1 day', false),
-  ('Pesca Sul Distribuidora','(51) 99340-7822', 'Rio Grande',   'RS','Linha Mono 0.50mm',       'Linhas', 200, 28000, 'Indicação', 'qualificado', now() - interval '3 days', now() + interval '2 days', true),
-  ('Atacadão da Pesca LTDA', '(11) 98765-4321', 'Santos',       'SP','Corda Náutica 12mm',      'Cordas',1000, 87000, 'Google',    'negociacao',  now() - interval '5 days', now() + interval '3 days', true),
-  ('Estaleiro Sul',          '(48) 99776-1122', 'Itajaí',       'SC','Corda Amarração 16mm',    'Cordas', 500, 42500, 'Indicação', 'fechado',     now() - interval '8 days', null, true)
-on conflict do nothing;
+-- (sem seed — banco começa vazio; cadastro feito pela equipe via dashboard)

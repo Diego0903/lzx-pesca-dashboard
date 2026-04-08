@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import {
-  mockLeads, mockInteractions, mockOrders,
-  type Lead, type Interaction, type Order, type LeadStage,
-} from '../data/mockCrm'
+import type { Lead, Interaction, Order, LeadStage } from '../data/mockCrm'
 
 // ── Row shapes que vêm do Supabase (snake_case) ────────────────
 interface LeadRow {
@@ -88,7 +85,7 @@ export interface UseCrmResult {
   orders: Order[]
   loading: boolean
   error: string | null
-  source: 'supabase' | 'mock'
+  source: 'supabase' | 'offline'
   reload: () => Promise<void>
   createLead: (lead: Omit<Lead, 'id'>) => Promise<void>
   moveLeadStage: (leadId: string, stage: LeadStage) => Promise<void>
@@ -101,21 +98,15 @@ export function useCrm(): UseCrmResult {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [source, setSource] = useState<'supabase' | 'mock'>('mock')
-
-  const fallbackToMock = useCallback((reason?: string) => {
-    setLeads(mockLeads)
-    setInteractions(mockInteractions)
-    setOrders(mockOrders)
-    setSource('mock')
-    if (reason) setError(reason)
-  }, [])
+  const [source, setSource] = useState<'supabase' | 'offline'>('offline')
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     if (!supabase) {
-      fallbackToMock()
+      setLeads([]); setInteractions([]); setOrders([])
+      setSource('offline')
+      setError('Supabase não configurado')
       setLoading(false)
       return
     }
@@ -134,18 +125,20 @@ export function useCrm(): UseCrmResult {
       setOrders((ordRes.data ?? []).map(mapOrder))
       setSource('supabase')
     } catch (e) {
-      console.warn('[useCrm] Supabase fetch failed — using mock data:', e)
-      fallbackToMock(e instanceof Error ? e.message : 'Falha ao carregar Supabase')
+      console.warn('[useCrm] Supabase fetch failed:', e)
+      setLeads([]); setInteractions([]); setOrders([])
+      setSource('offline')
+      setError(e instanceof Error ? e.message : 'Falha ao carregar dados')
     } finally {
       setLoading(false)
     }
-  }, [fallbackToMock])
+  }, [])
 
   useEffect(() => { load() }, [load])
 
   const createLead: UseCrmResult['createLead'] = useCallback(async (lead) => {
-    if (!supabase || source === 'mock') {
-      // optimistic local-only
+    if (!supabase) {
+      // optimistic local-only when Supabase is unavailable
       const local: Lead = { ...lead, id: `local-${Date.now()}` }
       setLeads(prev => [local, ...prev])
       return
@@ -167,20 +160,20 @@ export function useCrm(): UseCrmResult {
     }).select().single()
     if (err) throw err
     if (data) setLeads(prev => [mapLead(data as LeadRow), ...prev])
-  }, [source])
+  }, [])
 
   const moveLeadStage: UseCrmResult['moveLeadStage'] = useCallback(async (leadId, stage) => {
     setLeads(prev => prev.map(l => l.id === leadId ? { ...l, stage, lastContactAt: new Date().toISOString() } : l))
-    if (!supabase || source === 'mock') return
+    if (!supabase) return
     const { error: err } = await supabase
       .from('leads')
       .update({ stage, last_contact_at: new Date().toISOString() })
       .eq('id', leadId)
     if (err) console.warn('[useCrm] moveLeadStage error', err)
-  }, [source])
+  }, [])
 
   const addInteraction: UseCrmResult['addInteraction'] = useCallback(async (i) => {
-    if (!supabase || source === 'mock') {
+    if (!supabase) {
       const local: Interaction = { ...i, id: `local-${Date.now()}` }
       setInteractions(prev => [local, ...prev])
       setLeads(prev => prev.map(l => l.id === i.leadId ? { ...l, lastContactAt: i.date } : l))
@@ -199,7 +192,7 @@ export function useCrm(): UseCrmResult {
       await supabase.from('leads').update({ last_contact_at: i.date }).eq('id', i.leadId)
       setLeads(prev => prev.map(l => l.id === i.leadId ? { ...l, lastContactAt: i.date } : l))
     }
-  }, [source])
+  }, [])
 
   return {
     leads, interactions, orders, loading, error, source,

@@ -2,9 +2,8 @@ import { useMemo, useState, type FormEvent } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
-import {
-  leadsBySource, closeRateByCategory,
-  type Lead, type LeadStage, type LeadOrigin, type ContactType, type Interaction, type ProductCategory, type BrazilState,
+import type {
+  Lead, LeadStage, LeadOrigin, ContactType, Interaction, ProductCategory, BrazilState,
 } from '../data/mockCrm'
 import { useCrm } from '../hooks/useCrm'
 import { fmtBRL, fmtNum } from '../utils/formatters'
@@ -357,6 +356,29 @@ function MiniDashboard({ leads }: { leads: Lead[] }) {
   })
   const totalPipeline = leads.filter(l => l.stage !== 'perdido' && l.stage !== 'fechado').reduce((s, l) => s + l.estimatedValue, 0)
 
+  // Leads agrupados por origem (derivado dos leads reais)
+  const leadsBySource = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const l of leads) map.set(l.origin, (map.get(l.origin) ?? 0) + 1)
+    return Array.from(map.entries())
+      .map(([source, leads]) => ({ source, leads }))
+      .sort((a, b) => b.leads - a.leads)
+  }, [leads])
+
+  // Taxa de fechamento por categoria (fechados ÷ total) — só conta categorias com pelo menos 1 lead
+  const closeRateByCategory = useMemo(() => {
+    const map = new Map<string, { total: number; fechados: number }>()
+    for (const l of leads) {
+      const cur = map.get(l.category) ?? { total: 0, fechados: 0 }
+      cur.total += 1
+      if (l.stage === 'fechado') cur.fechados += 1
+      map.set(l.category, cur)
+    }
+    return Array.from(map.entries())
+      .map(([categoria, { total, fechados }]) => ({ categoria, taxa: total > 0 ? Math.round((fechados / total) * 100) : 0 }))
+      .sort((a, b) => b.taxa - a.taxa)
+  }, [leads])
+
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 16 }}>
       {/* KPIs em linha */}
@@ -379,39 +401,43 @@ function MiniDashboard({ leads }: { leads: Lead[] }) {
       </div>
 
       {/* Bar chart de origens */}
-      <div className="glass" style={{ padding: 20, gridColumn: '1 / -1' }}>
-        <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 700, fontSize: 13, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 14 }}>
-          Leads por Fonte
+      {leadsBySource.length > 0 && (
+        <div className="glass" style={{ padding: 20, gridColumn: '1 / -1' }}>
+          <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 700, fontSize: 13, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 14 }}>
+            Leads por Fonte
+          </div>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={leadsBySource} layout="vertical" margin={{ top: 4, right: 12, left: 12, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
+              <XAxis type="number" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis type="category" dataKey="source" tick={{ fill: 'var(--text-muted)', fontSize: 12 }} axisLine={false} tickLine={false} width={90} />
+              <Tooltip
+                cursor={{ fill: 'rgba(196,163,90,0.06)' }}
+                contentStyle={{ background: 'var(--surface2)', border: '1px solid var(--gold)', borderRadius: 8, fontSize: 12 }}
+              />
+              <Bar dataKey="leads" fill="#3b82f6" radius={[0, 6, 6, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
-        <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={leadsBySource} layout="vertical" margin={{ top: 4, right: 12, left: 12, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-            <XAxis type="number" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
-            <YAxis type="category" dataKey="source" tick={{ fill: 'var(--text-muted)', fontSize: 12 }} axisLine={false} tickLine={false} width={90} />
-            <Tooltip
-              cursor={{ fill: 'rgba(196,163,90,0.06)' }}
-              contentStyle={{ background: 'var(--surface2)', border: '1px solid var(--gold)', borderRadius: 8, fontSize: 12 }}
-            />
-            <Bar dataKey="leads" fill="#3b82f6" radius={[0, 6, 6, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+      )}
 
       {/* Close rate por categoria */}
-      <div className="glass" style={{ padding: 20, gridColumn: '1 / -1' }}>
-        <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 700, fontSize: 13, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 14 }}>
-          Taxa de Fechamento por Categoria
+      {closeRateByCategory.length > 0 && (
+        <div className="glass" style={{ padding: 20, gridColumn: '1 / -1' }}>
+          <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 700, fontSize: 13, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 14 }}>
+            Taxa de Fechamento por Categoria
+          </div>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={closeRateByCategory} margin={{ top: 4, right: 12, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+              <XAxis dataKey="categoria" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} width={40} unit="%" />
+              <Tooltip cursor={{ fill: 'rgba(196,163,90,0.06)' }} contentStyle={{ background: 'var(--surface2)', border: '1px solid var(--gold)', borderRadius: 8, fontSize: 12 }} formatter={(v) => `${v}%`} />
+              <Bar dataKey="taxa" fill="#16a34a" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
-        <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={closeRateByCategory} margin={{ top: 4, right: 12, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-            <XAxis dataKey="categoria" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} width={40} unit="%" />
-            <Tooltip cursor={{ fill: 'rgba(196,163,90,0.06)' }} contentStyle={{ background: 'var(--surface2)', border: '1px solid var(--gold)', borderRadius: 8, fontSize: 12 }} formatter={(v) => `${v}%`} />
-            <Bar dataKey="taxa" fill="#16a34a" radius={[6, 6, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+      )}
     </div>
   )
 }
@@ -441,11 +467,24 @@ export default function CrmPage() {
     <div className="fade-in">
       {/* Source banner */}
       <div style={{ marginBottom: 16, fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span className={`badge ${source === 'supabase' ? 'badge-green' : 'badge-orange'}`}>
-          {source === 'supabase' ? '🟢 Supabase conectado' : '🟡 Modo offline (dados de exemplo)'}
+        <span className={`badge ${source === 'supabase' ? 'badge-green' : 'badge-red'}`}>
+          {source === 'supabase' ? '🟢 Supabase conectado' : '🔴 Sem conexão com o banco'}
         </span>
         {error && <span style={{ color: 'var(--trust-red)' }}>· {error}</span>}
       </div>
+
+      {/* Empty state quando não há leads */}
+      {leads.length === 0 && source === 'supabase' && (
+        <div className="glass" style={{ padding: '60px 24px', textAlign: 'center', marginBottom: 24 }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }} aria-hidden="true">👥</div>
+          <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 700, fontSize: 16, color: 'var(--text)', marginBottom: 6 }}>
+            Nenhum lead cadastrado ainda
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', maxWidth: 460, margin: '0 auto' }}>
+            Use o formulário <strong>"+ Novo Lead"</strong> abaixo para começar a cadastrar clientes. O kanban e os gráficos serão preenchidos automaticamente.
+          </div>
+        </div>
+      )}
 
       <MiniDashboard leads={leads} />
 

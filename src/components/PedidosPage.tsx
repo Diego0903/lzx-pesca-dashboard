@@ -3,12 +3,49 @@ import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
-import {
-  monthlyRevenue, salesByCategory, ordersByState,
-  dashboardExtraKpis, type OrderStatus,
-} from '../data/mockCrm'
+import type { OrderStatus, Order } from '../data/mockCrm'
 import { useCrm } from '../hooks/useCrm'
 import { fmtBRL, fmtNum } from '../utils/formatters'
+
+// ── Helpers de agregação a partir de orders reais ──────────────
+function buildMonthlyRevenue(orders: Order[]) {
+  const months: { key: string; label: string; receita: number; pedidos: number }[] = []
+  const now = new Date()
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const label = d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '') + '/' + String(d.getFullYear()).slice(-2)
+    months.push({ key, label, receita: 0, pedidos: 0 })
+  }
+  for (const o of orders) {
+    const d = new Date(o.date)
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const slot = months.find(m => m.key === key)
+    if (slot) { slot.receita += o.value; slot.pedidos += 1 }
+  }
+  return months.map(({ label, receita, pedidos }) => ({ month: label, receita, pedidos }))
+}
+
+function buildOrdersByState(orders: Order[]) {
+  const map = new Map<string, number>()
+  for (const o of orders) map.set(o.state, (map.get(o.state) ?? 0) + 1)
+  return Array.from(map.entries())
+    .map(([estado, pedidos]) => ({ estado, pedidos }))
+    .sort((a, b) => b.pedidos - a.pedidos)
+}
+
+function buildSalesByCategory(orders: Order[]) {
+  const map = new Map<string, { vendas: number; receita: number }>()
+  for (const o of orders) {
+    const cur = map.get(o.category) ?? { vendas: 0, receita: 0 }
+    cur.vendas += 1
+    cur.receita += o.value
+    map.set(o.category, cur)
+  }
+  return Array.from(map.entries())
+    .map(([categoria, { vendas, receita }]) => ({ categoria, vendas, receita }))
+    .sort((a, b) => b.vendas - a.vendas)
+}
 
 const STATUS_LABEL: Record<OrderStatus, { label: string; cls: string }> = {
   novo:      { label: 'Novo',        cls: 'badge badge-blue' },
@@ -73,6 +110,15 @@ export default function PedidosPage() {
   const totalRevenue = orders.reduce((s, o) => s + o.value, 0)
   const closedCount = orders.filter(o => o.status === 'fechado').length
   const newCount = orders.filter(o => o.status === 'novo').length
+  const closedOrders = orders.filter(o => o.status === 'fechado')
+  const ticketMedio = closedOrders.length > 0 ? closedOrders.reduce((s, o) => s + o.value, 0) / closedOrders.length : 0
+
+  // Receita por mês (últimos 6 meses) — derivado de orders
+  const monthlyRevenue = useMemo(() => buildMonthlyRevenue(orders), [orders])
+  // Pedidos por estado — derivado
+  const ordersByState = useMemo(() => buildOrdersByState(orders), [orders])
+  // Vendas por categoria — derivado
+  const salesByCategory = useMemo(() => buildSalesByCategory(orders), [orders])
 
   if (loading) return (
     <div className="fade-in" style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)' }}>
@@ -84,8 +130,8 @@ export default function PedidosPage() {
   return (
     <div className="fade-in">
       <div style={{ marginBottom: 16, fontSize: 11, color: 'var(--text-muted)' }}>
-        <span className={`badge ${source === 'supabase' ? 'badge-green' : 'badge-orange'}`}>
-          {source === 'supabase' ? '🟢 Supabase conectado' : '🟡 Modo offline (dados de exemplo)'}
+        <span className={`badge ${source === 'supabase' ? 'badge-green' : 'badge-red'}`}>
+          {source === 'supabase' ? '🟢 Supabase conectado' : '🔴 Sem conexão com o banco'}
         </span>
       </div>
 
@@ -93,12 +139,20 @@ export default function PedidosPage() {
       <div className="stagger" style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 28 }}>
         <KpiCard icon="💰" label="Receita total" value={fmtBRL(totalRevenue)} sub="período acumulado" color="var(--gold)" />
         <KpiCard icon="📦" label="Pedidos no período" value={fmtNum(orders.length)} sub={`${newCount} novos · ${closedCount} fechados`} color="var(--trust-blue)" />
-        <KpiCard icon="🎯" label="Conversão WhatsApp" value={`${dashboardExtraKpis.whatsappConversion}%`} sub="leads que viram pedido" color="var(--trust-green)" />
-        <KpiCard icon="🧾" label="Ticket médio" value={fmtBRL(dashboardExtraKpis.ticketMedio)} sub="por pedido fechado" color="var(--purple)" />
-        <KpiCard icon="🔥" label="Mais consultado" value={dashboardExtraKpis.topConsultedProduct} sub={`${dashboardExtraKpis.topConsultedCount} consultas esta semana`} color="var(--trust-orange)" />
-        <KpiCard icon="⏱️" label="Tempo de resposta" value={`${dashboardExtraKpis.avgResponseMinutes} min`} sub="média no WhatsApp" color="var(--cyan)" />
+        <KpiCard icon="🧾" label="Ticket médio" value={ticketMedio > 0 ? fmtBRL(ticketMedio) : '—'} sub={ticketMedio > 0 ? 'por pedido fechado' : 'sem pedidos fechados'} color="var(--purple)" />
       </div>
 
+      {orders.length === 0 ? (
+        <div className="glass" style={{ padding: '60px 24px', textAlign: 'center', marginBottom: 24 }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }} aria-hidden="true">📦</div>
+          <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 700, fontSize: 16, color: 'var(--text)', marginBottom: 6 }}>
+            Nenhum pedido cadastrado ainda
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', maxWidth: 420, margin: '0 auto' }}>
+            Os gráficos e métricas serão preenchidos automaticamente conforme os pedidos forem registrados no Supabase.
+          </div>
+        </div>
+      ) : <>
       {/* Charts row 1 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 16, marginBottom: 16 }}>
         {/* Receita por mês */}
@@ -150,6 +204,7 @@ export default function PedidosPage() {
           </BarChart>
         </ResponsiveContainer>
       </div>
+      </>}
 
       {/* Tabela de pedidos */}
       <div className="glass" style={{ padding: 0, overflow: 'hidden' }}>

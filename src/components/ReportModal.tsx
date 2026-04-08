@@ -1,5 +1,6 @@
 interface Props {
   content: string
+  reportHtml?: string
   onClose: () => void
   mode?: 'technical' | 'executive'
 }
@@ -56,10 +57,20 @@ function inlineFormat(text: string): string {
     .replace(/`(.+?)`/g, '<code>$1</code>')
 }
 
-export default function ReportModal({ content, onClose, mode }: Props) {
+export default function ReportModal({ content, reportHtml, onClose, mode }: Props) {
   const handleCopy = () => navigator.clipboard.writeText(content)
 
   const handleDownloadPDF = () => {
+    // Executive mode gets its own rich HTML; technical mode converts markdown
+    if (reportHtml) {
+      const win = window.open('', '_blank')
+      if (!win) return
+      win.document.write(reportHtml)
+      win.document.close()
+      win.focus()
+      setTimeout(() => { win.print(); win.close() }, 600)
+      return
+    }
     const html = markdownToHtml(content)
     const logoUrl = `${window.location.origin}/logo.webp`
     const today = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })

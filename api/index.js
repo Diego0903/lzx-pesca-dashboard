@@ -179,6 +179,8 @@ app.post('/api/generate-report', async (req, res) => {
   try {
     const modeLabel = isTech ? 'Gestor de Tráfego' : 'Relatório Executivo'
     let report = `# ${modeLabel} — LZX Pesca\n**Gerado em:** ${now}  \n**Período:** ${period}\n\n---\n\n`
+    let execAds = null
+    let execIg = null
 
     // ── META ADS ──────────────────────────────────────────────────
     if (type === 'ads' || type === 'all') {
@@ -237,35 +239,8 @@ app.post('/api/generate-report', async (req, res) => {
         }
         report += '\n'
       } else {
-        // ── Executivo: linguagem simples, só o essencial ──
-        const perfLabel = ctr >= 2 ? '✅ Bom desempenho' : ctr >= 1 ? '🟡 Desempenho razoável' : '🔴 Desempenho abaixo do esperado'
-        report += `## 📊 Anúncios no Meta (Facebook e Instagram)\n\n`
-        report += `### Resumo do Período\n`
-        report += `| | |\n|---|---|\n`
-        report += `| 💰 Total investido em anúncios | **R$ ${totals.spend.toFixed(2)}** |\n`
-        report += `| 👥 Pessoas alcançadas | **${totals.reach.toLocaleString('pt-BR')}** |\n`
-        report += `| 👁️ Vezes que o anúncio foi visto | **${totals.impressions.toLocaleString('pt-BR')}** |\n`
-        report += `| 🖱️ Pessoas que clicaram | **${totals.clicks.toLocaleString('pt-BR')}** |\n`
-        if (totals.msgs > 0) report += `| 💬 Conversas iniciadas no WhatsApp | **${totals.msgs.toFixed(0)}** |\n`
-        if (totals.purchases > 0) report += `| 🛒 Vendas registradas | **${totals.purchases.toFixed(0)}** |\n`
-        report += `\n### Avaliação Geral\n`
-        report += `${perfLabel}\n\n`
-        if (totals.msgs > 0 && totals.spend > 0) {
-          const cpp = (totals.spend / totals.msgs).toFixed(2)
-          report += `Cada conversa no WhatsApp custou em média **R$ ${cpp}**.\n\n`
-        }
-        const activeCamps = camps.filter(c => parseFloat(c.spend || '0') > 0)
-        if (activeCamps.length > 0) {
-          report += `### Campanhas Ativas (${activeCamps.length})\n`
-          for (const c of activeCamps) {
-            const sp = parseFloat(c.spend || '0')
-            const msgs = (c.actions || []).filter(a => a.action_type.includes('messaging')).reduce((s, a) => s + parseFloat(a.value), 0)
-            report += `- **${c.campaign_name}** — R$ ${sp.toFixed(2)} investido`
-            if (msgs > 0) report += `, ${msgs.toFixed(0)} conversas`
-            report += '\n'
-          }
-          report += '\n'
-        }
+        // ── Executivo: dados para HTML visual ──
+        execAds = { totals, ctr, cpc, cpm, camps }
       }
     }
 
@@ -303,23 +278,183 @@ app.post('/api/generate-report', async (req, res) => {
           report += `| ❤️ Curtidas (posts recentes) | ${totalLikes.toLocaleString('pt-BR')} |\n`
           report += `| 💬 Comentários | ${totalComments.toLocaleString('pt-BR')} |\n`
         } else {
-          report += `## 📸 Instagram (@${prof.username})\n\n`
-          report += `### Resumo do Período\n`
-          report += `| | |\n|---|---|\n`
-          report += `| 👥 Total de seguidores | **${followers.toLocaleString('pt-BR')}** |\n`
-          if (newFollowers > 0) report += `| ➕ Seguidores novos no período | **+${newFollowers.toLocaleString('pt-BR')}** |\n`
-          report += `| 👁️ Pessoas que viram o perfil | **${sumIg('reach').toLocaleString('pt-BR')}** |\n`
-          report += `| 🔍 Visitas à página do perfil | **${sumIg('profile_views').toLocaleString('pt-BR')}** |\n`
-          if (sumIg('website_clicks') > 0) report += `| 🔗 Cliques no link da bio | **${sumIg('website_clicks').toLocaleString('pt-BR')}** |\n`
-          report += `| ❤️ Curtidas nos posts | **${totalLikes.toLocaleString('pt-BR')}** |\n`
-          report += `| 💬 Comentários nos posts | **${totalComments.toLocaleString('pt-BR')}** |\n`
+          execIg = { username: prof.username, followers, newFollowers, reach: sumIg('reach'), profileViews: sumIg('profile_views'), websiteClicks: sumIg('website_clicks'), totalLikes, totalComments }
         }
-        report += '\n'
+        if (isTech) report += '\n'
       }
     }
 
     report += `---\n_Relatório gerado automaticamente pelo Dashboard LZX Pesca_\n`
-    res.json({ success: true, report })
+
+    // ── Gera HTML visual para modo executivo ─────────────────────
+    let reportHtml = null
+    if (!isTech) {
+      const fmtN = n => n.toLocaleString('pt-BR')
+      const fmtR = n => `R$ ${n.toFixed(2).replace('.', ',')}`
+
+      const card = (icon, label, value, color = '#8a6200') =>
+        `<div class="card"><div class="card-icon">${icon}</div><div class="card-label">${label}</div><div class="card-value" style="color:${color}">${value}</div></div>`
+
+      const bar = (label, value, max, color, fmt) => {
+        const pct = max > 0 ? Math.min(value / max * 100, 100) : 0
+        return `<div class="bar-row">
+          <div class="bar-label">${label}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${pct.toFixed(1)}%;background:${color}"></div></div>
+          <div class="bar-val">${fmt(value)}</div>
+        </div>`
+      }
+
+      let adsSection = ''
+      if (execAds) {
+        const { totals, ctr, camps } = execAds
+        const activeCamps = camps.filter(c => parseFloat(c.spend || '0') > 0)
+        const ctrColor = ctr >= 2 ? '#3d7a00' : ctr >= 1 ? '#c47a00' : '#c0392b'
+        const ctrLabel = ctr >= 2 ? 'Bom ✅' : ctr >= 1 ? 'Razoável 🟡' : 'Baixo 🔴'
+        const cpp = totals.msgs > 0 ? totals.spend / totals.msgs : 0
+        const ctrPct = Math.min(ctr / 4 * 100, 100)
+        const msgsPct = totals.clicks > 0 ? Math.min(totals.msgs / totals.clicks * 100, 100) : 0
+
+        adsSection = `
+        <div class="section-title">📊 Anúncios — Facebook & Instagram</div>
+        <div class="cards-grid">
+          ${card('💰', 'Total Investido', fmtR(totals.spend), '#8a6200')}
+          ${card('👥', 'Pessoas Alcançadas', fmtN(totals.reach), '#1a5276')}
+          ${card('👁️', 'Vezes que foi visto', fmtN(totals.impressions), '#1a5276')}
+          ${card('🖱️', 'Cliques', fmtN(totals.clicks), '#1a5276')}
+          ${totals.msgs > 0 ? card('💬', 'Conversas WhatsApp', fmtN(totals.msgs), '#1e8449') : ''}
+          ${totals.msgs > 0 ? card('💳', 'Custo por Conversa', fmtR(cpp), '#7d6608') : ''}
+        </div>
+
+        <div class="subsection-title">Desempenho dos Anúncios</div>
+        <div class="gauge-row">
+          <div class="gauge-label">Taxa de cliques (CTR) — <strong style="color:${ctrColor}">${ctr.toFixed(2)}% — ${ctrLabel}</strong></div>
+          <div class="gauge-track">
+            <div class="gauge-fill" style="width:${ctrPct.toFixed(1)}%;background:${ctrColor}"></div>
+            <div class="gauge-target" style="left:50%"></div>
+          </div>
+          <div class="gauge-hints"><span>0%</span><span style="position:absolute;left:50%;transform:translateX(-50%)">Meta: 2%</span><span>4%+</span></div>
+        </div>
+
+        ${totals.msgs > 0 ? `
+        <div class="subsection-title">Funil de Conversão</div>
+        <div class="funnel">
+          ${bar('👁️ Visualizações', totals.impressions, totals.impressions, '#2980b9', fmtN)}
+          ${bar('🖱️ Cliques', totals.clicks, totals.impressions, '#8e44ad', fmtN)}
+          ${bar('💬 Conversas WhatsApp', totals.msgs, totals.clicks, '#1e8449', fmtN)}
+        </div>
+        <p class="funnel-note">De cada 100 pessoas que viram o anúncio, <strong>${(totals.clicks / totals.impressions * 100).toFixed(1)}</strong> clicaram e <strong>${(totals.msgs / totals.impressions * 100).toFixed(2)}</strong> iniciaram uma conversa no WhatsApp.</p>
+        ` : ''}
+
+        <div class="subsection-title">Campanhas Ativas — ${activeCamps.length} no período</div>
+        <div class="camp-bars">
+          ${activeCamps.slice(0, 8).map(c => {
+            const sp = parseFloat(c.spend || '0')
+            const msgs = (c.actions || []).filter(a => a.action_type.includes('messaging')).reduce((s, a) => s + parseFloat(a.value), 0)
+            const pct = execAds.totals.spend > 0 ? (sp / execAds.totals.spend * 100).toFixed(1) : 0
+            return `<div class="camp-row">
+              <div class="camp-name">${c.campaign_name}</div>
+              <div class="camp-bar-wrap"><div class="camp-bar-fill" style="width:${pct}%"></div></div>
+              <div class="camp-stats">${fmtR(sp)}${msgs > 0 ? ` · ${fmtN(msgs)} conv.` : ''}</div>
+            </div>`
+          }).join('')}
+        </div>`
+      }
+
+      let igSection = ''
+      if (execIg) {
+        const ig = execIg
+        igSection = `
+        <div class="page-break"></div>
+        <div class="section-title">📸 Instagram — @${ig.username}</div>
+        <div class="cards-grid">
+          ${card('👥', 'Total de Seguidores', fmtN(ig.followers), '#6c3483')}
+          ${ig.newFollowers > 0 ? card('➕', 'Novos Seguidores', `+${fmtN(ig.newFollowers)}`, '#1e8449') : ''}
+          ${card('📡', 'Pessoas Alcançadas', fmtN(ig.reach), '#1a5276')}
+          ${card('🔍', 'Visitas ao Perfil', fmtN(ig.profileViews), '#1a5276')}
+          ${ig.websiteClicks > 0 ? card('🔗', 'Cliques no Link da Bio', fmtN(ig.websiteClicks), '#784212') : ''}
+          ${card('❤️', 'Curtidas nos Posts', fmtN(ig.totalLikes), '#c0392b')}
+          ${card('💬', 'Comentários', fmtN(ig.totalComments), '#1a5276')}
+        </div>
+
+        <div class="subsection-title">Engajamento</div>
+        <div class="funnel">
+          ${bar('👥 Seguidores', ig.followers, ig.followers, '#6c3483', fmtN)}
+          ${bar('📡 Alcance no período', ig.reach, ig.followers, '#2980b9', fmtN)}
+          ${bar('🔍 Visitas ao Perfil', ig.profileViews, ig.reach || 1, '#8e44ad', fmtN)}
+          ${bar('❤️ Curtidas', ig.totalLikes, ig.reach || 1, '#c0392b', fmtN)}
+        </div>`
+      }
+
+      reportHtml = `<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório Executivo LZX Pesca</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Rubik','Segoe UI',sans-serif;font-size:13px;color:#1a1a1a;background:#fff}
+  .header{background:#0d1017;padding:20px 36px;display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #c4a35a}
+  .header-left{display:flex;align-items:center;gap:14px}
+  .header img{height:44px}
+  .header-div{width:1px;height:36px;background:rgba(196,163,90,0.4)}
+  .header-title{color:#c4a35a;font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+  .header-sub{color:#8a95a8;font-size:11px;margin-top:2px}
+  .header-date{color:#8a95a8;font-size:11px;text-align:right;line-height:1.6}
+  .header-date strong{color:#c4a35a;font-size:13px}
+  .body{padding:28px 36px;max-width:860px;margin:0 auto}
+  .report-title{font-size:20px;font-weight:700;color:#0d1017;margin-bottom:4px}
+  .report-period{font-size:12px;color:#7a7060;margin-bottom:28px}
+  .section-title{font-size:14px;font-weight:700;color:#fff;background:#0d1017;padding:10px 16px;border-left:4px solid #c4a35a;border-radius:0 6px 6px 0;margin:28px 0 16px;letter-spacing:.04em}
+  .subsection-title{font-size:12px;font-weight:600;color:#5a3e00;text-transform:uppercase;letter-spacing:.06em;margin:20px 0 10px;padding-bottom:4px;border-bottom:1px solid #e8dcc8}
+  .cards-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:8px}
+  .card{background:#faf7f2;border:1px solid #e8dcc8;border-radius:10px;padding:14px 16px}
+  .card-icon{font-size:20px;margin-bottom:6px}
+  .card-label{font-size:11px;color:#7a7060;margin-bottom:4px}
+  .card-value{font-size:22px;font-weight:700;letter-spacing:-.5px}
+  .gauge-row{margin-bottom:16px}
+  .gauge-label{font-size:12px;color:#333;margin-bottom:6px}
+  .gauge-track{height:14px;background:#e8dcc8;border-radius:7px;position:relative;overflow:visible}
+  .gauge-fill{height:100%;border-radius:7px;transition:width .3s}
+  .gauge-target{position:absolute;top:-4px;height:22px;width:2px;background:#c4a35a}
+  .gauge-hints{display:flex;justify-content:space-between;font-size:10px;color:#999;margin-top:4px;position:relative}
+  .funnel{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+  .bar-row{display:grid;grid-template-columns:160px 1fr 100px;align-items:center;gap:8px}
+  .bar-label{font-size:12px;color:#333}
+  .bar-track{height:18px;background:#e8dcc8;border-radius:4px;overflow:hidden}
+  .bar-fill{height:100%;border-radius:4px}
+  .bar-val{font-size:12px;font-weight:600;text-align:right;color:#333}
+  .funnel-note{font-size:12px;color:#5a5a5a;background:#f5f0e8;border-left:3px solid #c4a35a;padding:10px 14px;border-radius:0 6px 6px 0;margin-top:12px;line-height:1.6}
+  .camp-bars{display:flex;flex-direction:column;gap:8px}
+  .camp-row{display:grid;grid-template-columns:1fr 120px 130px;align-items:center;gap:10px}
+  .camp-name{font-size:11px;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .camp-bar-wrap{height:10px;background:#e8dcc8;border-radius:5px;overflow:hidden}
+  .camp-bar-fill{height:100%;background:#c4a35a;border-radius:5px}
+  .camp-stats{font-size:11px;color:#7a7060;text-align:right}
+  .page-break{page-break-before:always;margin-top:0}
+  .footer{background:#0d1017;color:#8a95a8;font-size:11px;text-align:center;padding:14px;border-top:1px solid rgba(196,163,90,.3);margin-top:40px}
+  @media print{
+    .header,.section-title,.footer{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .page-break{page-break-before:always}
+    .card{break-inside:avoid}
+  }
+</style></head><body>
+<div class="header">
+  <div class="header-left">
+    <img src="${`${process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'http://localhost:3000'}`}/logo.webp" alt="LZX" onerror="this.style.display='none'">
+    <div class="header-div"></div>
+    <div><div class="header-title">Dashboard Meta Ads</div><div class="header-sub">Relatório de Performance</div></div>
+  </div>
+  <div class="header-date">Gerado em<br><strong>${now}</strong><br><span style="font-size:10px">Período: ${period}</span></div>
+</div>
+<div class="body">
+  <div class="report-title">Relatório Executivo — LZX Pesca</div>
+  <div class="report-period">Período: ${period}</div>
+  ${adsSection}
+  ${igSection}
+</div>
+<div class="footer">LZX Equipamentos para Pesca — Relatório gerado automaticamente pelo Dashboard Meta Ads</div>
+</body></html>`
+    }
+
+    res.json({ success: true, report, reportHtml })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 

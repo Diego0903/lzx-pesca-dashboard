@@ -40,6 +40,7 @@ export default function App() {
   const [insightsError, setInsightsError] = useState<string | null>(null)
   const [showReport, setShowReport] = useState(false)
   const [reportContent, setReportContent] = useState('')
+  const [reportHtml, setReportHtml] = useState<string | undefined>(undefined)
   const [generatingReport, setGeneratingReport] = useState(false)
   const [dateRange, setDateRange] = useState<DateRange>({ since: '', until: '', preset: 'maximum' })
   const [activeTab, setActiveTab] = useState<'ads' | 'instagram'>('ads')
@@ -125,6 +126,7 @@ export default function App() {
         reportMode,
       )
       setReportContent(res.report)
+      setReportHtml(res.reportHtml)
       setShowReport(true)
     } catch (e) {
       alert('Erro ao gerar relatório: ' + (e instanceof Error ? e.message : ''))
@@ -386,7 +388,7 @@ export default function App() {
       </main>
 
       {showReport && (
-        <ReportModal content={reportContent} onClose={() => setShowReport(false)} mode={reportMode} />
+        <ReportModal content={reportContent} reportHtml={reportHtml} onClose={() => setShowReport(false)} mode={reportMode} />
       )}
     </div>
   )

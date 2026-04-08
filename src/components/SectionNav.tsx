@@ -3,7 +3,10 @@ export type Section = 'marketing' | 'crm' | 'pedidos' | 'usuarios' | 'configurac
 interface Props {
   active: Section
   onChange: (s: Section) => void
-  showDonoItems?: boolean     // mostra abas "Usuários" e "Configurações" (só Dono)
+  /** Mostra aba "Usuários" — apenas Dono */
+  showUsuariosItem?: boolean
+  /** Mostra aba "Configurações" — apenas Dono */
+  showConfigItem?: boolean
   pendentesCount?: number     // badge no botão Usuários
 }
 
@@ -12,14 +15,19 @@ const BASE_ITEMS: { key: Section; label: string; icon: string }[] = [
   { key: 'crm',       label: 'CRM',       icon: '👥' },
   { key: 'pedidos',   label: 'Pedidos',   icon: '📦' },
 ]
-const DONO_ITEMS: { key: Section; label: string; icon: string }[] = [
-  { key: 'usuarios',     label: 'Usuários',      icon: '🔑' },
-  { key: 'configuracoes',label: 'Configurações', icon: '⚙️' },
-]
+const USUARIOS_ITEM = { key: 'usuarios' as const,     label: 'Usuários',      icon: '🔑' }
+const CONFIG_ITEM   = { key: 'configuracoes' as const, label: 'Configurações', icon: '⚙️' }
+
+function buildItems(showUsuarios: boolean, showConfig: boolean) {
+  const items: { key: Section; label: string; icon: string }[] = [...BASE_ITEMS]
+  if (showUsuarios) items.push(USUARIOS_ITEM)
+  if (showConfig)   items.push(CONFIG_ITEM)
+  return items
+}
 
 /** Pílula horizontal — visível apenas em desktop */
-export default function SectionNav({ active, onChange, showDonoItems, pendentesCount = 0 }: Props) {
-  const items = showDonoItems ? [...BASE_ITEMS, ...DONO_ITEMS] : BASE_ITEMS
+export default function SectionNav({ active, onChange, showUsuariosItem = false, showConfigItem = false, pendentesCount = 0 }: Props) {
+  const items = buildItems(showUsuariosItem, showConfigItem)
   return (
     <nav className="section-nav-desktop" aria-label="Seções principais">
       {items.map(it => (
@@ -56,8 +64,8 @@ export default function SectionNav({ active, onChange, showDonoItems, pendentesC
 }
 
 /** Bottom nav fixo — visível apenas em mobile */
-export function MobileBottomNav({ active, onChange, showDonoItems, pendentesCount = 0 }: Props) {
-  const items = showDonoItems ? [...BASE_ITEMS, ...DONO_ITEMS] : BASE_ITEMS
+export function MobileBottomNav({ active, onChange, showUsuariosItem = false, showConfigItem = false, pendentesCount = 0 }: Props) {
+  const items = buildItems(showUsuariosItem, showConfigItem)
   return (
     <nav className="bottom-nav" aria-label="Navegação móvel">
       {items.map(it => (

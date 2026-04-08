@@ -50,7 +50,15 @@ export default function App() {
   const [reportContent, setReportContent] = useState('')
   const [reportHtml, setReportHtml] = useState<string | undefined>(undefined)
   const [generatingReport, setGeneratingReport] = useState(false)
-  const [dateRange, setDateRange] = useState<DateRange>({ since: '', until: '', preset: 'maximum' })
+  const [dateRange, setDateRange] = useState<DateRange>(() => {
+    // Padrão: "Hoje" (era "Todo o histórico" antes)
+    const today = new Date()
+    const yyyy = today.getFullYear()
+    const mm = String(today.getMonth() + 1).padStart(2, '0')
+    const dd = String(today.getDate()).padStart(2, '0')
+    const isoDate = `${yyyy}-${mm}-${dd}`
+    return { since: isoDate, until: isoDate, preset: 'today' }
+  })
   const [activeTab, setActiveTab] = useState<'ads' | 'instagram'>('ads')
   const [igUserId, setIgUserId] = useState<string>('')
   const [showReportMenu, setShowReportMenu] = useState(false)
@@ -320,7 +328,7 @@ export default function App() {
       <main className="main-content">
         {/* Top section nav: Marketing | CRM | Pedidos | (Usuários | Configurações) */}
         <div style={{ marginBottom: 20, display: 'flex', justifyContent: 'flex-start' }}>
-          <SectionNav active={section} onChange={setSection} showDonoItems={isDono} pendentesCount={pendentesCount} />
+          <SectionNav active={section} onChange={setSection} showUsuariosItem={isDono} showConfigItem={isDono} pendentesCount={pendentesCount} />
         </div>
 
         {section === 'crm' && <CrmPage />}
@@ -426,9 +434,12 @@ export default function App() {
             <div style={{ marginTop: 24 }}>
               <TimeSeriesChart data={timeSeries} />
             </div>
-            <div style={{ marginTop: 24 }}>
-              <CampaignTable insights={insights} />
-            </div>
+            {/* Tabela de campanhas — apenas Dono (gestor de tráfego). Admin vê só o resumo. */}
+            {isDono && (
+              <div style={{ marginTop: 24 }}>
+                <CampaignTable insights={insights} />
+              </div>
+            )}
           </>
         )}
 
@@ -466,7 +477,7 @@ export default function App() {
       )}
 
       {/* Bottom nav fixo — só aparece em mobile */}
-      <MobileBottomNav active={section} onChange={setSection} showDonoItems={isDono} pendentesCount={pendentesCount} />
+      <MobileBottomNav active={section} onChange={setSection} showUsuariosItem={isDono} showConfigItem={isDono} pendentesCount={pendentesCount} />
     </div>
   )
 }

@@ -16,10 +16,7 @@ interface CardProps {
 
 function Card({ label, value, sub, desc, color = 'var(--blue)', icon }: CardProps) {
   return (
-    <div style={{
-      background: 'var(--surface)',
-      border: '1px solid var(--border)',
-      borderRadius: 10,
+    <div className="glass glass-hover" style={{
       padding: '18px 20px',
       flex: '1 1 150px',
     }}>
@@ -64,7 +61,7 @@ export default function MetricsSummary({ insights }: Props) {
       <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 600, marginBottom: 12, fontSize: 14, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
         Métricas Consolidadas
       </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+      <div className="stagger" style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
         <Card label="Total Investido" value={fmtBRL(totals.spend)} sub={`${totals.activeCount} campanhas ativas`} color="var(--blue)" icon="💰" />
         <Card label="Impressões" value={fmtNum(totals.impressions)} color="var(--purple)" icon="👁️" />
         <Card label="Cliques" value={fmtNum(totals.clicks)} color="var(--cyan)" icon="🖱️" />

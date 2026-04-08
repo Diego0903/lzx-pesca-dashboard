@@ -9,6 +9,9 @@ import ReportModal from './components/ReportModal'
 import WhatsAppSection from './components/WhatsAppSection'
 import DateFilter, { type DateRange } from './components/DateFilter'
 import InstagramInsights from './components/InstagramInsights'
+import SectionNav, { type Section } from './components/SectionNav'
+import CrmPage from './components/CrmPage'
+import PedidosPage from './components/PedidosPage'
 import type { CampaignInsight, TimeSeriesPoint } from './types'
 
 interface TokenInfo {
@@ -51,6 +54,7 @@ export default function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     return (localStorage.getItem('lzx-theme') as 'dark' | 'light') || 'dark'
   })
+  const [section, setSection] = useState<Section>('marketing')
 
   // Aplica tema
   useEffect(() => {
@@ -140,9 +144,11 @@ export default function App() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
       {/* Header */}
-      <header style={{
-        background: 'var(--surface)',
-        borderBottom: '1px solid rgba(196,163,90,0.2)',
+      <header className="glass-strong" style={{
+        borderRadius: 0,
+        borderTop: 'none',
+        borderLeft: 'none',
+        borderRight: 'none',
         padding: '0 24px',
         display: 'flex',
         alignItems: 'center',
@@ -264,6 +270,15 @@ export default function App() {
       </header>
 
       <main className="main-content">
+        {/* Top section nav: Marketing | CRM | Pedidos */}
+        <div style={{ marginBottom: 20, display: 'flex', justifyContent: 'flex-start' }}>
+          <SectionNav active={section} onChange={setSection} />
+        </div>
+
+        {section === 'crm' && <CrmPage />}
+        {section === 'pedidos' && <PedidosPage />}
+
+        {section === 'marketing' && <>
         {/* Aviso de permissões */}
         {tokenInfo && !hasAdsAccess && (
           <TokenWarning tokenInfo={tokenInfo} />
@@ -385,6 +400,7 @@ export default function App() {
             </div>
           </div>
         )}
+        </>}
       </main>
 
       {showReport && (

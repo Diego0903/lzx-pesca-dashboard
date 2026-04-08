@@ -28,6 +28,19 @@
   --red:       #ee5a4a;
   --cyan:      #4aa8c0;
   --purple:    #a855f7;
+
+  /* CRM trust accents */
+  --trust-blue:    #3b82f6;
+  --trust-blue-d:  #1e40af;
+  --trust-green:   #16a34a;
+  --trust-orange:  #f97316;
+  --trust-red:     #dc2626;
+
+  /* Glass surface tokens */
+  --glass-bg:      rgba(30, 37, 48, 0.55);
+  --glass-bg-2:    rgba(37, 45, 58, 0.65);
+  --glass-border:  rgba(196, 163, 90, 0.18);
+  --glass-shadow:  0 10px 32px -12px rgba(0, 0, 0, 0.55);
 }
 
 /* ── Tema Claro ─────────────────────────────────────── */
@@ -52,6 +65,17 @@
   --red:       #c0392b;
   --cyan:      #1a7a96;
   --purple:    #7c3aed;
+
+  --trust-blue:    #1e40af;
+  --trust-blue-d:  #1e3a8a;
+  --trust-green:   #15803d;
+  --trust-orange:  #c2410c;
+  --trust-red:     #b91c1c;
+
+  --glass-bg:      rgba(255, 255, 255, 0.78);
+  --glass-bg-2:    rgba(255, 255, 255, 0.92);
+  --glass-border:  rgba(138, 98, 0, 0.18);
+  --glass-shadow:  0 10px 32px -12px rgba(60, 40, 0, 0.18);
 }
 
 body {
@@ -92,3 +116,241 @@ body {
   .campaign-filter { width: 130px; }
   .date-filter-dropdown { right: auto; left: 0; }
 }
+
+/* ── Glassmorphism ──────────────────────────────────── */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  border-radius: 14px;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+.glass-strong {
+  background: var(--glass-bg-2);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+}
+.glass-hover:hover {
+  border-color: rgba(196, 163, 90, 0.38);
+  box-shadow: 0 14px 40px -14px rgba(0, 0, 0, 0.6);
+}
+[data-theme="light"] .glass-hover:hover {
+  border-color: rgba(138, 98, 0, 0.38);
+  box-shadow: 0 14px 40px -14px rgba(60, 40, 0, 0.22);
+}
+
+/* ── Stagger entrance animation ─────────────────────── */
+@keyframes slideUpFade {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-in {
+  animation: slideUpFade 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.stagger > * {
+  animation: slideUpFade 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.stagger > *:nth-child(1) { animation-delay: 0.04s; }
+.stagger > *:nth-child(2) { animation-delay: 0.08s; }
+.stagger > *:nth-child(3) { animation-delay: 0.12s; }
+.stagger > *:nth-child(4) { animation-delay: 0.16s; }
+.stagger > *:nth-child(5) { animation-delay: 0.20s; }
+.stagger > *:nth-child(6) { animation-delay: 0.24s; }
+.stagger > *:nth-child(7) { animation-delay: 0.28s; }
+.stagger > *:nth-child(8) { animation-delay: 0.32s; }
+.stagger > *:nth-child(9) { animation-delay: 0.36s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-in, .stagger > * { animation: none !important; }
+  .glass, .glass-hover { transition: none !important; }
+}
+
+/* ── Top Section Nav (Marketing · CRM · Pedidos) ────── */
+.section-nav {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  padding: 4px;
+}
+.section-nav button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-family: 'Rubik', sans-serif;
+  font-weight: 500;
+  font-size: 13px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s;
+  white-space: nowrap;
+}
+.section-nav button:hover { color: var(--text); background: rgba(196,163,90,0.08); }
+.section-nav button.active {
+  background: var(--gold);
+  color: #1a1500;
+  font-weight: 700;
+}
+.section-nav-mobile-toggle { display: none; }
+
+@media (max-width: 720px) {
+  .section-nav {
+    position: relative;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0;
+  }
+  .section-nav button { display: none; }
+  .section-nav.open button { display: flex; }
+  .section-nav button.active { display: flex; }
+  .section-nav-mobile-toggle { display: inline-flex; }
+}
+
+/* ── Status badges (CRM / Pedidos) ──────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+.badge-blue   { background: rgba(59,130,246,0.14); color: var(--trust-blue);  border: 1px solid rgba(59,130,246,0.32); }
+.badge-green  { background: rgba(22,163,74,0.14);  color: var(--trust-green); border: 1px solid rgba(22,163,74,0.32); }
+.badge-orange { background: rgba(249,115,22,0.14); color: var(--trust-orange);border: 1px solid rgba(249,115,22,0.32); }
+.badge-red    { background: rgba(220,38,38,0.14);  color: var(--trust-red);   border: 1px solid rgba(220,38,38,0.32); }
+.badge-gold   { background: rgba(196,163,90,0.14); color: var(--gold);        border: 1px solid rgba(196,163,90,0.32); }
+.badge-muted  { background: rgba(138,149,168,0.14);color: var(--text-muted);  border: 1px solid rgba(138,149,168,0.28); }
+
+/* ── Kanban ─────────────────────────────────────────── */
+.kanban {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(240px, 1fr));
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+.kanban-col {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  padding: 12px;
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: background 0.2s, border-color 0.2s;
+}
+.kanban-col.drag-over {
+  background: rgba(196,163,90,0.12);
+  border-color: var(--gold);
+}
+.kanban-col-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--gold);
+  padding: 4px 4px 8px;
+  border-bottom: 1px solid var(--glass-border);
+}
+.kanban-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: grab;
+  transition: border-color 0.18s, transform 0.18s, box-shadow 0.18s;
+  user-select: none;
+}
+.kanban-card:hover {
+  border-color: var(--gold);
+  box-shadow: 0 6px 18px -8px rgba(0,0,0,0.4);
+}
+.kanban-card:active { cursor: grabbing; }
+.kanban-card.dragging { opacity: 0.4; }
+
+/* ── Table (CRM/Pedidos) ────────────────────────────── */
+.data-table { width: 100%; border-collapse: collapse; }
+.data-table th, .data-table td {
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.data-table th {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  background: var(--surface2);
+}
+.data-table tbody tr { transition: background 0.12s; }
+.data-table tbody tr:hover { background: rgba(196,163,90,0.06); }
+.data-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ── Form fields ────────────────────────────────────── */
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.field input, .field select, .field textarea {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 12px;
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.18s, box-shadow 0.18s;
+}
+.field input:focus, .field select:focus, .field textarea:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(196,163,90,0.18);
+}
+
+/* ── Btn primary/secondary ──────────────────────────── */
+.btn-primary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  background: var(--gold); color: #1a1500;
+  border: none; border-radius: 8px;
+  padding: 9px 16px;
+  font-size: 13px; font-weight: 700;
+  font-family: 'Rubik', sans-serif;
+  cursor: pointer;
+  transition: filter 0.18s;
+}
+.btn-primary:hover { filter: brightness(1.08); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-secondary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  background: var(--surface2); color: var(--text);
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 8px 14px; font-size: 12px; font-weight: 500;
+  cursor: pointer; transition: background 0.18s, border-color 0.18s;
+}
+.btn-secondary:hover { background: var(--surface3); border-color: var(--gold); }

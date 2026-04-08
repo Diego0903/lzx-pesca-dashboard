@@ -64,51 +64,65 @@
   --font-mono:    'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace;
 }
 
-/* ── Tema Claro — Ivory + Brass ─────────────────────── */
+/* ── Tema Claro — Warm Ivory + Antique Brass ────────── */
 [data-theme="light"] {
-  --bg:        #f6f3ec;
+  /* Neutros — paleta marfim quente, mais luminosa */
+  --bg:        #faf7ef;        /* Marfim quente, levemente dourado */
   --bg-elev:   #ffffff;
   --surface:   #ffffff;
-  --surface2:  #f0ece4;
-  --surface3:  #e6dfd0;
-  --border:    #e2dccc;
-  --border-soft: rgba(0,0,0,0.06);
-  --text:      #15110b;
-  --text-muted:#6a5f50;
-  --text-dim:  #978a78;
+  --surface2:  #f4efe1;        /* Hover com tom creme */
+  --surface3:  #ebe4d0;        /* Inputs / terciária */
+  --border:    #e8e0cc;        /* Borda creme suave */
+  --border-soft: rgba(120, 90, 30, 0.08);
+  --text:      #1c1810;        /* Marrom muito escuro (não preto puro) */
+  --text-muted:#6f6248;        /* Bronze médio para labels */
+  --text-dim:  #a39479;        /* Tom areia para placeholders */
 
-  --gold:        #8a6200;
-  --gold-light:  #a37800;
-  --gold-deep:   #5e4200;
-  --gold-glow:   rgba(138, 98, 0, 0.18);
+  /* Brand — bronze antigo mais quente e rico */
+  --gold:        #a07a23;       /* Bronze envelhecido — mais vibrante que o antigo #8a6200 */
+  --gold-light:  #c69a3a;       /* Highlight quente */
+  --gold-deep:   #6e5215;       /* Sombra profunda */
+  --gold-glow:   rgba(160, 122, 35, 0.20);
 
   --navy:      #ffffff;
 
-  --blue:      #8a6200;
-  --green:     #2e7d32;
-  --green-dark:#1b5e20;
-  --yellow:    #c47a00;
-  --red:       #b91c1c;
-  --cyan:      #1a7a96;
-  --purple:    #6d28d9;
+  /* Acentos semânticos — saturação contida pra elegância */
+  --blue:      #a07a23;
+  --green:     #3d8b3d;
+  --green-dark:#256a25;
+  --yellow:    #b8761c;
+  --red:       #c0392b;
+  --cyan:      #1f7a92;
+  --purple:    #6d3fb5;
 
-  --trust-blue:    #1e40af;
-  --trust-blue-d:  #1e3a8a;
-  --trust-green:   #15803d;
-  --trust-orange:  #c2410c;
-  --trust-red:     #b91c1c;
+  /* CRM trust accents — refinados pro modo claro */
+  --trust-blue:    #2563eb;
+  --trust-blue-d:  #1d4ed8;
+  --trust-green:   #16803c;
+  --trust-orange:  #d97706;
+  --trust-red:     #c0392b;
 
-  --glass-bg:      rgba(255, 255, 255, 0.82);
-  --glass-bg-2:    rgba(255, 255, 255, 0.94);
-  --glass-border:  rgba(138, 98, 0, 0.14);
-  --glass-border-strong: rgba(138, 98, 0, 0.28);
+  /* Glass — vidro creme luminoso */
+  --glass-bg:      rgba(255, 253, 247, 0.78);
+  --glass-bg-2:    rgba(255, 254, 250, 0.92);
+  --glass-border:  rgba(160, 122, 35, 0.18);
+  --glass-border-strong: rgba(160, 122, 35, 0.35);
 
-  --shadow-sm:  0 1px 2px rgba(60,40,0,0.06), 0 1px 1px rgba(60,40,0,0.04);
-  --shadow-md:  0 4px 8px -2px rgba(60,40,0,0.10), 0 2px 4px -2px rgba(60,40,0,0.06);
-  --shadow-lg:  0 12px 28px -8px rgba(60,40,0,0.16), 0 4px 12px -4px rgba(60,40,0,0.08);
-  --shadow-xl:  0 24px 56px -16px rgba(60,40,0,0.20), 0 8px 20px -6px rgba(60,40,0,0.10);
-  --shadow-glow:0 0 0 1px var(--glass-border), 0 8px 24px -10px rgba(138,98,0,0.18);
+  /* Sombras em camadas — mais quentes (tom bronze) e mais visíveis */
+  --shadow-sm:  0 1px 2px rgba(80, 55, 10, 0.06), 0 1px 2px rgba(80, 55, 10, 0.04);
+  --shadow-md:  0 4px 12px -2px rgba(80, 55, 10, 0.10), 0 2px 6px -2px rgba(80, 55, 10, 0.06);
+  --shadow-lg:  0 14px 32px -10px rgba(80, 55, 10, 0.18), 0 6px 14px -4px rgba(80, 55, 10, 0.10);
+  --shadow-xl:  0 28px 60px -18px rgba(80, 55, 10, 0.22), 0 10px 22px -6px rgba(80, 55, 10, 0.12);
+  --shadow-glow:0 0 0 1px var(--glass-border), 0 10px 28px -12px rgba(160, 122, 35, 0.32);
   --glass-shadow: var(--shadow-lg);
+}
+
+/* Background ambient — gradiente quente no light mode */
+[data-theme="light"] body::before {
+  background:
+    radial-gradient(1000px 600px at 85% -10%, rgba(160, 122, 35, 0.08), transparent 60%),
+    radial-gradient(800px 500px at -10% 110%, rgba(37, 99, 235, 0.04), transparent 60%),
+    radial-gradient(600px 400px at 50% 50%, rgba(255, 250, 235, 0.4), transparent 70%);
 }
 
 body {
@@ -135,11 +149,6 @@ body::before {
   background:
     radial-gradient(900px 500px at 85% -10%, rgba(200,165,92,0.05), transparent 60%),
     radial-gradient(700px 400px at -10% 110%, rgba(77,138,245,0.04), transparent 60%);
-}
-[data-theme="light"] body::before {
-  background:
-    radial-gradient(900px 500px at 85% -10%, rgba(138,98,0,0.05), transparent 60%),
-    radial-gradient(700px 400px at -10% 110%, rgba(30,64,175,0.04), transparent 60%);
 }
 
 #root { position: relative; z-index: 1; }

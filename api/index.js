@@ -345,19 +345,7 @@ app.post('/api/generate-report', async (req, res) => {
         <p class="funnel-note">De cada 100 pessoas que viram o anúncio, <strong>${(totals.clicks / totals.impressions * 100).toFixed(1)}</strong> clicaram e <strong>${(totals.msgs / totals.impressions * 100).toFixed(2)}</strong> iniciaram uma conversa no WhatsApp.</p>
         ` : ''}
 
-        <div class="subsection-title">Campanhas Ativas — ${activeCamps.length} no período</div>
-        <div class="camp-bars">
-          ${activeCamps.slice(0, 8).map(c => {
-            const sp = parseFloat(c.spend || '0')
-            const msgs = (c.actions || []).filter(a => a.action_type.includes('messaging')).reduce((s, a) => s + parseFloat(a.value), 0)
-            const pct = execAds.totals.spend > 0 ? (sp / execAds.totals.spend * 100).toFixed(1) : 0
-            return `<div class="camp-row">
-              <div class="camp-name">${c.campaign_name}</div>
-              <div class="camp-bar-wrap"><div class="camp-bar-fill" style="width:${pct}%"></div></div>
-              <div class="camp-stats">${fmtR(sp)}${msgs > 0 ? ` · ${fmtN(msgs)} conv.` : ''}</div>
-            </div>`
-          }).join('')}
-        </div>`
+        `
       }
 
       let igSection = ''
@@ -422,13 +410,7 @@ app.post('/api/generate-report', async (req, res) => {
   .bar-fill{height:100%;border-radius:4px}
   .bar-val{font-size:12px;font-weight:600;text-align:right;color:#333}
   .funnel-note{font-size:12px;color:#5a5a5a;background:#f5f0e8;border-left:3px solid #c4a35a;padding:10px 14px;border-radius:0 6px 6px 0;margin-top:12px;line-height:1.6}
-  .camp-bars{display:flex;flex-direction:column;gap:8px}
-  .camp-row{display:grid;grid-template-columns:1fr 120px 130px;align-items:center;gap:10px}
-  .camp-name{font-size:11px;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .camp-bar-wrap{height:10px;background:#e8dcc8;border-radius:5px;overflow:hidden}
-  .camp-bar-fill{height:100%;background:#c4a35a;border-radius:5px}
-  .camp-stats{font-size:11px;color:#7a7060;text-align:right}
-  .page-break{page-break-before:always;margin-top:0}
+.page-break{page-break-before:always;margin-top:0}
   .footer{background:#0d1017;color:#8a95a8;font-size:11px;text-align:center;padding:14px;border-top:1px solid rgba(196,163,90,.3);margin-top:40px}
   @media print{
     .header,.section-title,.footer{-webkit-print-color-adjust:exact;print-color-adjust:exact}

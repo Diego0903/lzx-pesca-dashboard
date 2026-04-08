@@ -112,7 +112,17 @@ export default function App() {
   // Verifica token ao montar
   useEffect(() => {
     api.tokenStatus()
-      .then(r => setTokenInfo(r.data))
+      .then(r => {
+        if (r.error) {
+          setTokenError(`Token da Meta inválido ou expirado: ${r.error.message}`)
+          setTokenInfo(null)
+        } else if (r.data) {
+          setTokenInfo(r.data)
+          setTokenError(null)
+        } else {
+          setTokenError('Resposta inesperada do servidor.')
+        }
+      })
       .catch(e => setTokenError(e.message))
   }, [])
 
@@ -315,6 +325,14 @@ export default function App() {
         {section === 'usuarios' && isDono && <AdminUsuariosPage />}
 
         {section === 'marketing' && <>
+        {/* Loading inicial — enquanto a checagem de token não resolveu */}
+        {!tokenInfo && !tokenError && (
+          <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)' }}>
+            <div style={{ fontSize: 32, marginBottom: 12 }}>⏳</div>
+            Verificando token da Meta API...
+          </div>
+        )}
+
         {/* Aviso de permissões */}
         {tokenInfo && !hasAdsAccess && (
           <TokenWarning tokenInfo={tokenInfo} />

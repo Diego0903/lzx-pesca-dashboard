@@ -22,7 +22,7 @@ function dateParams(since?: string, until?: string) {
 }
 
 export const api = {
-  tokenStatus: () => get<{ data: { is_valid: boolean; scopes: string[]; expires_at: number; application: string } }>('/token-status'),
+  tokenStatus: () => get<{ data?: { is_valid: boolean; scopes: string[]; expires_at: number; application: string }; error?: { message: string; type?: string; code?: number } }>('/token-status'),
   adAccounts: () => get<{ data?: unknown[]; error?: { message: string } }>('/ad-accounts'),
   campaigns: (accountId: string) => get<{ data?: unknown[]; error?: { message: string } }>(`/campaigns/${accountId}`),
   accountInsights: (accountId: string, since?: string, until?: string) => {

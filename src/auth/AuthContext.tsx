@@ -84,26 +84,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!sb) { setLoading(false); return }
     let mounted = true
 
-    // Antes de qualquer coisa: se a sessão local expirou pelas regras do
-    // "permanecer conectado", força logout
-    if (isLocalSessionExpired()) {
-      sb.auth.signOut().finally(() => {
-        try {
-          localStorage.removeItem(KEEP_KEY)
-          localStorage.removeItem(STARTED_KEY)
-        } catch {}
-      })
-    }
-
-    sb.auth.getSession().then(async ({ data }) => {
-      if (!mounted) return
-      setSession(data.session)
-      if (data.session?.user) {
-        const u = await fetchUsuario(data.session.user.id)
-        if (mounted) setUsuario(u)
+    // Safety net: se algo travar, força loading=false após 8s pra não deixar
+    // o usuário preso na tela "Carregando..."
+    const failsafe = setTimeout(() => {
+      if (mounted) {
+        console.warn('[AuthContext] init timeout — forçando loading=false')
+        setLoading(false)
       }
-      if (mounted) setLoading(false)
-    })
+    }, 8000)
+
+    const init = async () => {
+      try {
+        // Se a sessão local expirou pelas regras do "permanecer conectado", força logout
+        if (isLocalSessionExpired()) {
+          await sb.auth.signOut()
+          try {
+            localStorage.removeItem(KEEP_KEY)
+            localStorage.removeItem(STARTED_KEY)
+          } catch {}
+        }
+
+        const { data } = await sb.auth.getSession()
+        if (!mounted) return
+        setSession(data.session)
+        if (data.session?.user) {
+          const u = await fetchUsuario(data.session.user.id)
+          if (mounted) setUsuario(u)
+        }
+      } catch (e) {
+        console.warn('[AuthContext] erro durante init:', e)
+      } finally {
+        if (mounted) {
+          clearTimeout(failsafe)
+          setLoading(false)
+        }
+      }
+    }
+    init()
 
     const { data: sub } = sb.auth.onAuthStateChange(async (_event, newSession) => {
       setSession(newSession)
@@ -115,7 +132,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     })
 
-    return () => { mounted = false; sub.subscription.unsubscribe() }
+    return () => {
+      mounted = false
+      clearTimeout(failsafe)
+      sub.subscription.unsubscribe()
+    }
   }, [fetchUsuario])
 
   const signIn: AuthContextValue['signIn'] = async (email, password, keepSignedIn = false) => {

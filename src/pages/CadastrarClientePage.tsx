@@ -306,15 +306,28 @@ function MeusCadastrosHistory() {
 
   useEffect(() => { load() }, [load])
 
-  // Sincroniza a lista quando admin/dono move o stage no kanban
+  // Sincroniza a lista quando admin/dono move o stage no kanban.
+  // Realtime com fallback pra polling 30s caso a publication não esteja habilitada.
   useEffect(() => {
     if (!supabase) return
     const sb = supabase
+    let pollingInterval: ReturnType<typeof setInterval> | null = null
+    const startPollingFallback = () => {
+      if (pollingInterval) return
+      pollingInterval = setInterval(() => load(), 30000)
+    }
     const ch = sb
       .channel('funcionario-history')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, () => load())
-      .subscribe()
-    return () => { sb.removeChannel(ch) }
+      .subscribe(status => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          startPollingFallback()
+        }
+      })
+    return () => {
+      if (pollingInterval) clearInterval(pollingInterval)
+      sb.removeChannel(ch)
+    }
   }, [load])
 
   const updateStage = async (id: string, newStage: LeadStage) => {

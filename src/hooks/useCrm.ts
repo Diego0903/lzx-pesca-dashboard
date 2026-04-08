@@ -181,23 +181,40 @@ export function useCrm(): UseCrmResult {
 
   useEffect(() => { load() }, [load])
 
-  // Supabase Realtime — coalesce vários eventos próximos numa única refetch
-  // pra evitar storm de requests quando há batch update no banco.
+  // Sincronização em tempo real entre clientes.
+  // Tenta Realtime primeiro; se falhar (ex: publication não habilitada no Postgres),
+  // faz fallback automático pra polling de 30 segundos. Assim a sincronização
+  // funciona mesmo se a migration 007_enable_realtime.sql não tiver sido aplicada.
   useEffect(() => {
     if (!supabase) return
     const sb = supabase
-    let timer: ReturnType<typeof setTimeout> | null = null
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null
+    let pollingInterval: ReturnType<typeof setInterval> | null = null
+
     const debouncedReload = () => {
-      if (timer) return
-      timer = setTimeout(() => { timer = null; loadRef.current() }, 250)
+      if (debounceTimer) return
+      debounceTimer = setTimeout(() => { debounceTimer = null; loadRef.current() }, 250)
     }
+
+    const startPollingFallback = () => {
+      if (pollingInterval) return
+      console.warn('[useCrm] Realtime indisponível — usando polling 30s')
+      pollingInterval = setInterval(() => loadRef.current(), 30000)
+    }
+
     const channel = sb
       .channel('crm-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' },        debouncedReload)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'interactions' }, debouncedReload)
-      .subscribe()
+      .subscribe(status => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          startPollingFallback()
+        }
+      })
+
     return () => {
-      if (timer) clearTimeout(timer)
+      if (debounceTimer) clearTimeout(debounceTimer)
+      if (pollingInterval) clearInterval(pollingInterval)
       sb.removeChannel(channel)
     }
   }, [])

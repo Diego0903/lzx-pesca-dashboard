@@ -9,7 +9,7 @@ import ReportModal from './components/ReportModal'
 import WhatsAppSection from './components/WhatsAppSection'
 import DateFilter, { type DateRange } from './components/DateFilter'
 import InstagramInsights from './components/InstagramInsights'
-import SectionNav, { type Section } from './components/SectionNav'
+import SectionNav, { MobileBottomNav, type Section } from './components/SectionNav'
 import CrmPage from './components/CrmPage'
 import PedidosPage from './components/PedidosPage'
 import type { CampaignInsight, TimeSeriesPoint } from './types'
@@ -183,19 +183,6 @@ export default function App() {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {tokenInfo && (
-            <span style={{
-              background: tokenInfo.is_valid ? 'rgba(136,200,0,0.12)' : 'rgba(238,90,74,0.12)',
-              color: tokenInfo.is_valid ? 'var(--green)' : 'var(--red)',
-              border: `1px solid ${tokenInfo.is_valid ? 'rgba(136,200,0,0.3)' : 'rgba(238,90,74,0.3)'}`,
-              borderRadius: 6,
-              padding: '4px 10px',
-              fontSize: 12,
-              fontWeight: 600,
-            }}>
-              ● <span className="report-btn-label">{tokenInfo.is_valid ? 'Conectado' : 'Desconectado'}</span>
-            </span>
-          )}
           <button
             onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
             title={theme === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
@@ -406,6 +393,9 @@ export default function App() {
       {showReport && (
         <ReportModal content={reportContent} reportHtml={reportHtml} onClose={() => setShowReport(false)} mode={reportMode} />
       )}
+
+      {/* Bottom nav fixo — só aparece em mobile */}
+      <MobileBottomNav active={section} onChange={setSection} />
     </div>
   )
 }

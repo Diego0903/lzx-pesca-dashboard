@@ -3,7 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import type {
-  Lead, LeadStage, LeadOrigin, ContactType, Interaction, ProductCategory, BrazilState,
+  Lead, LeadItem, LeadStage, LeadOrigin, ContactType, Interaction, ProductCategory, BrazilState,
 } from '../data/mockCrm'
 import { useCrm } from '../hooks/useCrm'
 import { fmtBRL, fmtNum } from '../utils/formatters'
@@ -108,30 +108,52 @@ function Kanban({ leads, onMove, onSelect, selectedId }: KanbanProps) {
   )
 }
 
-interface LeadFormState {
-  name: string; whatsapp: string; city: string; state: BrazilState
-  product: string; category: ProductCategory; estimatedQty: string; origin: LeadOrigin
+interface ItemFormState {
+  product: string
+  category: ProductCategory
+  qty: string
+  value: string
 }
 
+interface LeadFormState {
+  name: string
+  whatsapp: string
+  city: string
+  state: BrazilState
+  origin: LeadOrigin
+  items: ItemFormState[]
+  shippingValue: string
+}
+
+const EMPTY_ITEM: ItemFormState = { product: '', category: 'Redes', qty: '', value: '' }
+
 const EMPTY_FORM: LeadFormState = {
-  name: '', whatsapp: '', city: '', state: 'SC',
-  product: '', category: 'Redes', estimatedQty: '', origin: 'Google',
+  name: '', whatsapp: '', city: '', state: 'SC', origin: 'Google',
+  items: [{ ...EMPTY_ITEM }],
+  shippingValue: '',
 }
 
 interface ListProps {
   leads: Lead[]
   onSelect: (l: Lead) => void
+  onDelete: (l: Lead) => void
 }
 
-function ClientList({ leads, onSelect }: ListProps) {
+function ClientList({ leads, onSelect, onDelete }: ListProps) {
   const [q, setQ] = useState('')
   const [stateFilter, setStateFilter] = useState<BrazilState | 'all'>('all')
   const [catFilter, setCatFilter] = useState<ProductCategory | 'all'>('all')
 
   const filtered = useMemo(() => leads.filter(l => {
     if (stateFilter !== 'all' && l.state !== stateFilter) return false
-    if (catFilter !== 'all' && l.category !== catFilter) return false
-    if (q && !l.name.toLowerCase().includes(q.toLowerCase()) && !l.product.toLowerCase().includes(q.toLowerCase())) return false
+    // Multi-categoria: lead casa se QUALQUER item dele tem a categoria escolhida
+    if (catFilter !== 'all' && !l.items.some(it => it.category === catFilter)) return false
+    if (q) {
+      const needle = q.toLowerCase()
+      const inName = l.name.toLowerCase().includes(needle)
+      const inProduct = l.items.some(it => it.product.toLowerCase().includes(needle))
+      if (!inName && !inProduct) return false
+    }
     return true
   }), [leads, q, stateFilter, catFilter])
 
@@ -160,26 +182,61 @@ function ClientList({ leads, onSelect }: ListProps) {
         </div>
       </div>
       <div style={{ maxHeight: 360, overflowY: 'auto' }}>
-        {filtered.map(l => (
-          <button
-            key={l.id}
-            type="button"
-            onClick={() => onSelect(l)}
-            style={{ width: '100%', textAlign: 'left', background: 'transparent', border: 'none', borderBottom: '1px solid var(--border)', padding: '12px 18px', cursor: 'pointer', color: 'var(--text)' }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(196,163,90,0.06)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-              <strong style={{ fontSize: 13 }}>{l.name}</strong>
-              <span className={`badge ${l.recurring ? 'badge-gold' : 'badge-blue'}`}>
-                {l.recurring ? 'Recorrente' : 'Novo'}
-              </span>
+        {filtered.map(l => {
+          const productSummary = l.items.length > 1
+            ? `${l.items[0].product} +${l.items.length - 1}`
+            : (l.items[0]?.product ?? l.product ?? '—')
+          return (
+            <div
+              key={l.id}
+              style={{ display: 'flex', alignItems: 'stretch', borderBottom: '1px solid var(--border)' }}
+            >
+              <button
+                type="button"
+                onClick={() => onSelect(l)}
+                style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'transparent', border: 'none', padding: '12px 18px', cursor: 'pointer', color: 'var(--text)' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(196,163,90,0.06)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, gap: 6 }}>
+                  <strong style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.name}</strong>
+                  <span className={`badge ${l.recurring ? 'badge-gold' : 'badge-blue'}`}>
+                    {l.recurring ? 'Recorrente' : 'Novo'}
+                  </span>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {l.city}/{l.state} · {productSummary} · {fmtBRL(l.estimatedValue)}
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirm(`Excluir o lead "${l.name}"?\n\nEssa ação remove o lead e todas as suas interações. Não pode ser desfeita.`)) {
+                    onDelete(l)
+                  }
+                }}
+                aria-label={`Excluir lead ${l.name}`}
+                title="Excluir lead"
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  borderLeft: '1px solid var(--border)',
+                  color: 'var(--trust-red)',
+                  cursor: 'pointer',
+                  padding: '0 14px',
+                  fontSize: 16,
+                  display: 'flex',
+                  alignItems: 'center',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(220,38,38,0.12)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              >
+                🗑️
+              </button>
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-              {l.city}/{l.state} · {l.product} · {fmtBRL(l.estimatedValue)}
-            </div>
-          </button>
-        ))}
+          )
+        })}
         {filtered.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>Nenhum cliente encontrado.</div>}
       </div>
     </div>
@@ -272,20 +329,50 @@ function NewLeadForm({ onCreate }: FormProps) {
   const [form, setForm] = useState<LeadFormState>(EMPTY_FORM)
   const update = <K extends keyof LeadFormState>(k: K, v: LeadFormState[K]) => setForm(f => ({ ...f, [k]: v }))
 
+  const updateItem = (idx: number, patch: Partial<ItemFormState>) =>
+    setForm(f => ({ ...f, items: f.items.map((it, i) => i === idx ? { ...it, ...patch } : it) }))
+
+  const addItem = () =>
+    setForm(f => ({ ...f, items: [...f.items, { ...EMPTY_ITEM }] }))
+
+  const removeItem = (idx: number) =>
+    setForm(f => ({ ...f, items: f.items.length > 1 ? f.items.filter((_, i) => i !== idx) : f.items }))
+
+  const subtotal = form.items.reduce((s, it) => s + (parseFloat(it.value || '0') || 0), 0)
+  const frete = parseFloat(form.shippingValue || '0') || 0
+  const total = subtotal + frete
+
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
     if (!form.name.trim() || !form.whatsapp.trim()) return
-    const qty = parseInt(form.estimatedQty || '0') || 0
+
+    const items: LeadItem[] = form.items
+      .map(it => ({
+        product: it.product.trim(),
+        category: it.category,
+        qty: parseInt(it.qty || '0') || 0,
+        value: parseFloat(it.value || '0') || 0,
+      }))
+      .filter(it => it.product.length > 0)
+
+    if (items.length === 0) {
+      alert('Adicione pelo menos 1 produto.')
+      return
+    }
+
     const newLead: Lead = {
       id: `l${Date.now()}`,
       name: form.name.trim(),
       whatsapp: form.whatsapp.trim(),
       city: form.city.trim(),
       state: form.state,
-      product: form.product.trim(),
-      category: form.category,
-      estimatedQty: qty,
-      estimatedValue: qty * 250, // estimativa rápida
+      items,
+      shippingValue: frete,
+      // Campos derivados (o useCrm também recalcula no salvamento)
+      product: items.map(i => i.product).join(' · '),
+      category: items[0].category,
+      estimatedQty: items.reduce((s, it) => s + it.qty, 0),
+      estimatedValue: items.reduce((s, it) => s + it.value, 0) + frete,
       origin: form.origin,
       stage: 'novo',
       lastContactAt: new Date().toISOString(),
@@ -301,7 +388,9 @@ function NewLeadForm({ onCreate }: FormProps) {
       <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 700, fontSize: 13, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 14 }}>
         + Novo Lead
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+
+      {/* Dados básicos */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 18 }}>
         <div className="field">
           <label htmlFor="lf-name">Nome</label>
           <input id="lf-name" required value={form.name} onChange={e => update('name', e.target.value)} placeholder="Cliente ou empresa" />
@@ -321,27 +410,147 @@ function NewLeadForm({ onCreate }: FormProps) {
           </select>
         </div>
         <div className="field">
-          <label htmlFor="lf-product">Produto de interesse</label>
-          <input id="lf-product" value={form.product} onChange={e => update('product', e.target.value)} placeholder="Ex: Rede 70mm" />
-        </div>
-        <div className="field">
-          <label htmlFor="lf-cat">Categoria</label>
-          <select id="lf-cat" value={form.category} onChange={e => update('category', e.target.value as ProductCategory)}>
-            {(['Redes','Linhas','Tralhas','Cordas','Boias'] as ProductCategory[]).map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-        </div>
-        <div className="field">
-          <label htmlFor="lf-qty">Quantidade estimada</label>
-          <input id="lf-qty" type="number" min={0} value={form.estimatedQty} onChange={e => update('estimatedQty', e.target.value)} />
-        </div>
-        <div className="field">
           <label htmlFor="lf-origin">Origem</label>
           <select id="lf-origin" value={form.origin} onChange={e => update('origin', e.target.value as LeadOrigin)}>
             {(['Google','Instagram','Facebook','Indicação','WhatsApp'] as LeadOrigin[]).map(o => <option key={o} value={o}>{o}</option>)}
           </select>
         </div>
       </div>
-      <div style={{ marginTop: 14, display: 'flex', justifyContent: 'flex-end' }}>
+
+      {/* Produtos do pedido (lista dinâmica) */}
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Produtos do pedido
+          </div>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+            {form.items.length} {form.items.length === 1 ? 'item' : 'itens'}
+          </span>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {form.items.map((item, idx) => (
+            <div
+              key={idx}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'minmax(180px, 2fr) minmax(120px, 1fr) minmax(80px, 0.7fr) minmax(110px, 1fr) auto',
+                gap: 8,
+                alignItems: 'end',
+                background: 'rgba(196,163,90,0.04)',
+                border: '1px solid var(--border)',
+                borderRadius: 10,
+                padding: 12,
+              }}
+            >
+              <div className="field">
+                <label htmlFor={`lf-prod-${idx}`}>Produto {idx + 1}</label>
+                <input
+                  id={`lf-prod-${idx}`}
+                  value={item.product}
+                  onChange={e => updateItem(idx, { product: e.target.value })}
+                  placeholder="Ex: Rede Multifilamento 70mm"
+                />
+              </div>
+              <div className="field">
+                <label htmlFor={`lf-cat-${idx}`}>Categoria</label>
+                <select
+                  id={`lf-cat-${idx}`}
+                  value={item.category}
+                  onChange={e => updateItem(idx, { category: e.target.value as ProductCategory })}
+                >
+                  {(['Redes','Linhas','Tralhas','Cordas','Boias'] as ProductCategory[]).map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div className="field">
+                <label htmlFor={`lf-qty-${idx}`}>Qtd</label>
+                <input
+                  id={`lf-qty-${idx}`}
+                  type="number"
+                  min={0}
+                  value={item.qty}
+                  onChange={e => updateItem(idx, { qty: e.target.value })}
+                />
+              </div>
+              <div className="field">
+                <label htmlFor={`lf-val-${idx}`}>Valor (R$)</label>
+                <input
+                  id={`lf-val-${idx}`}
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={item.value}
+                  onChange={e => updateItem(idx, { value: e.target.value })}
+                  placeholder="0,00"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => removeItem(idx)}
+                disabled={form.items.length <= 1}
+                aria-label={`Remover produto ${idx + 1}`}
+                title="Remover este produto"
+                style={{
+                  background: 'transparent',
+                  border: '1px solid var(--border)',
+                  borderRadius: 8,
+                  color: 'var(--trust-red)',
+                  cursor: form.items.length <= 1 ? 'not-allowed' : 'pointer',
+                  opacity: form.items.length <= 1 ? 0.35 : 1,
+                  width: 36,
+                  height: 36,
+                  fontSize: 14,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  alignSelf: 'flex-end',
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <button type="button" onClick={addItem} className="btn-secondary" style={{ marginTop: 10 }}>
+          + Adicionar produto
+        </button>
+      </div>
+
+      {/* Frete + Totais */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+        gap: 12,
+        padding: 14,
+        background: 'rgba(196,163,90,0.06)',
+        border: '1px solid var(--glass-border)',
+        borderRadius: 10,
+        marginBottom: 14,
+      }}>
+        <div className="field">
+          <label htmlFor="lf-frete">Valor do frete (R$)</label>
+          <input
+            id="lf-frete"
+            type="number"
+            min={0}
+            step="0.01"
+            value={form.shippingValue}
+            onChange={e => update('shippingValue', e.target.value)}
+            placeholder="0,00"
+          />
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Subtotal produtos</div>
+          <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>{fmtBRL(subtotal)}</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Total do pedido</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--gold)' }}>{fmtBRL(total)}</div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
         <button type="submit" className="btn-primary">Salvar lead</button>
       </div>
     </form>
@@ -365,14 +574,20 @@ function MiniDashboard({ leads }: { leads: Lead[] }) {
       .sort((a, b) => b.leads - a.leads)
   }, [leads])
 
-  // Taxa de fechamento por categoria (fechados ÷ total) — só conta categorias com pelo menos 1 lead
+  // Taxa de fechamento por categoria — itera todos os items dos leads
+  // (um lead com 3 produtos de 3 categorias diferentes conta em cada uma)
   const closeRateByCategory = useMemo(() => {
     const map = new Map<string, { total: number; fechados: number }>()
     for (const l of leads) {
-      const cur = map.get(l.category) ?? { total: 0, fechados: 0 }
-      cur.total += 1
-      if (l.stage === 'fechado') cur.fechados += 1
-      map.set(l.category, cur)
+      const seen = new Set<string>()
+      for (const it of l.items) {
+        if (seen.has(it.category)) continue  // não conta categoria duplicada no mesmo lead
+        seen.add(it.category)
+        const cur = map.get(it.category) ?? { total: 0, fechados: 0 }
+        cur.total += 1
+        if (l.stage === 'fechado') cur.fechados += 1
+        map.set(it.category, cur)
+      }
     }
     return Array.from(map.entries())
       .map(([categoria, { total, fechados }]) => ({ categoria, taxa: total > 0 ? Math.round((fechados / total) * 100) : 0 }))
@@ -443,7 +658,7 @@ function MiniDashboard({ leads }: { leads: Lead[] }) {
 }
 
 export default function CrmPage() {
-  const { leads, interactions, loading, error, source, createLead, moveLeadStage, addInteraction } = useCrm()
+  const { leads, interactions, loading, error, source, createLead, moveLeadStage, addInteraction, deleteLead } = useCrm()
   const [selected, setSelected] = useState<Lead | null>(null)
 
   // Pick a default selected lead once data lands
@@ -454,6 +669,11 @@ export default function CrmPage() {
     const { id, ...payload } = lead
     void id
     void createLead(payload)
+  }
+
+  const handleDelete = (lead: Lead) => {
+    if (selected?.id === lead.id) setSelected(null)
+    void deleteLead(lead.id)
   }
 
   if (loading) return (
@@ -496,7 +716,7 @@ export default function CrmPage() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 16, marginBottom: 20 }}>
-        <ClientList leads={leads} onSelect={setSelected} />
+        <ClientList leads={leads} onSelect={setSelected} onDelete={handleDelete} />
         <InteractionTimeline lead={effectiveSelected} interactions={interactions} onAdd={(i) => void addInteraction(i)} />
       </div>
 

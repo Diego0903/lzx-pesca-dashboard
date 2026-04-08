@@ -33,10 +33,12 @@ create table if not exists public.leads (
   whatsapp            text,
   city                text,
   state               text,
-  product             text,
-  category            product_category,
+  product             text,                       -- legacy single-product (mantido por compat)
+  category            product_category,           -- legacy single-category
   estimated_qty       integer default 0,
-  estimated_value     numeric(12,2) default 0,
+  estimated_value     numeric(12,2) default 0,    -- subtotal dos itens
+  items               jsonb default '[]'::jsonb,  -- [{product, category, qty, value}]
+  shipping_value      numeric(12,2) default 0,    -- frete
   origin              lead_origin,
   stage               lead_stage default 'novo',
   last_contact_at     timestamptz default now(),

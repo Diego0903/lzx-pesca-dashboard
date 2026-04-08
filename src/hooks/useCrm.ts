@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import type { Lead, Interaction, Order, LeadStage } from '../data/mockCrm'
+import type { Lead, LeadItem, Interaction, Order, LeadStage, ProductCategory } from '../data/mockCrm'
 
 // ── Row shapes que vêm do Supabase (snake_case) ────────────────
 interface LeadRow {
@@ -13,6 +13,8 @@ interface LeadRow {
   category: string | null
   estimated_qty: number | null
   estimated_value: number | null
+  items: LeadItem[] | null
+  shipping_value: number | null
   origin: string | null
   stage: string | null
   last_contact_at: string | null
@@ -42,22 +44,49 @@ interface OrderRow {
 }
 
 // ── Mappers row → app type ─────────────────────────────────────
-const mapLead = (r: LeadRow): Lead => ({
-  id: r.id,
-  name: r.name,
-  whatsapp: r.whatsapp ?? '',
-  city: r.city ?? '',
-  state: (r.state as Lead['state']) ?? 'Outros',
-  product: r.product ?? '',
-  category: (r.category as Lead['category']) ?? 'Redes',
-  estimatedQty: r.estimated_qty ?? 0,
-  estimatedValue: Number(r.estimated_value ?? 0),
-  origin: (r.origin as Lead['origin']) ?? 'Google',
-  stage: (r.stage as LeadStage) ?? 'novo',
-  lastContactAt: r.last_contact_at ?? new Date().toISOString(),
-  nextFollowUpAt: r.next_follow_up_at ?? undefined,
-  recurring: Boolean(r.recurring),
-})
+const mapLead = (r: LeadRow): Lead => {
+  // Items vem do JSONB; se o registro for legacy (sem items), tenta reconstruir
+  // a partir dos campos antigos product/category/estimated_qty/estimated_value
+  const rawItems = Array.isArray(r.items) ? r.items : []
+  const items: LeadItem[] = rawItems.length > 0
+    ? rawItems.map(it => ({
+        product: String(it.product ?? ''),
+        category: (it.category as ProductCategory) ?? 'Redes',
+        qty: Number(it.qty ?? 0),
+        value: Number(it.value ?? 0),
+      }))
+    : (r.product
+        ? [{
+            product: r.product,
+            category: (r.category as ProductCategory) ?? 'Redes',
+            qty: r.estimated_qty ?? 0,
+            value: Number(r.estimated_value ?? 0),
+          }]
+        : [])
+
+  const shippingValue = Number(r.shipping_value ?? 0)
+  const subtotal = items.reduce((s, it) => s + it.value, 0)
+
+  return {
+    id: r.id,
+    name: r.name,
+    whatsapp: r.whatsapp ?? '',
+    city: r.city ?? '',
+    state: (r.state as Lead['state']) ?? 'Outros',
+    items,
+    shippingValue,
+    // Campos derivados (mantidos para retro-compat com kanban/lista)
+    product: items.map(i => i.product).filter(Boolean).join(' · ') || (r.product ?? ''),
+    category: items[0]?.category ?? (r.category as Lead['category']) ?? 'Redes',
+    estimatedQty: items.reduce((s, it) => s + it.qty, 0) || (r.estimated_qty ?? 0),
+    estimatedValue: subtotal + shippingValue || Number(r.estimated_value ?? 0),
+    origin: (r.origin as Lead['origin']) ?? 'Google',
+    stage: (r.stage as LeadStage) ?? 'novo',
+    lastContactAt: r.last_contact_at ?? new Date().toISOString(),
+    nextFollowUpAt: r.next_follow_up_at ?? undefined,
+    recurring: Boolean(r.recurring),
+  }
+}
 
 const mapInteraction = (r: InteractionRow): Interaction => ({
   id: r.id,
@@ -90,6 +119,7 @@ export interface UseCrmResult {
   createLead: (lead: Omit<Lead, 'id'>) => Promise<void>
   moveLeadStage: (leadId: string, stage: LeadStage) => Promise<void>
   addInteraction: (i: Omit<Interaction, 'id'>) => Promise<void>
+  deleteLead: (leadId: string) => Promise<void>
 }
 
 export function useCrm(): UseCrmResult {
@@ -143,15 +173,20 @@ export function useCrm(): UseCrmResult {
       setLeads(prev => [local, ...prev])
       return
     }
+    const subtotal = lead.items.reduce((s, it) => s + it.value, 0)
     const { data, error: err } = await supabase.from('leads').insert({
       name: lead.name,
       whatsapp: lead.whatsapp,
       city: lead.city,
       state: lead.state,
-      product: lead.product,
-      category: lead.category,
-      estimated_qty: lead.estimatedQty,
-      estimated_value: lead.estimatedValue,
+      // Multi-item structure
+      items: lead.items,
+      shipping_value: lead.shippingValue,
+      // Legacy mirror for retro-compat / first item
+      product: lead.items.map(i => i.product).filter(Boolean).join(' · ') || lead.product,
+      category: lead.items[0]?.category ?? lead.category,
+      estimated_qty: lead.items.reduce((s, it) => s + it.qty, 0),
+      estimated_value: subtotal,
       origin: lead.origin,
       stage: lead.stage,
       last_contact_at: lead.lastContactAt,
@@ -160,6 +195,20 @@ export function useCrm(): UseCrmResult {
     }).select().single()
     if (err) throw err
     if (data) setLeads(prev => [mapLead(data as LeadRow), ...prev])
+  }, [])
+
+  const deleteLead: UseCrmResult['deleteLead'] = useCallback(async (leadId) => {
+    // Optimistic remove from UI
+    setLeads(prev => prev.filter(l => l.id !== leadId))
+    setInteractions(prev => prev.filter(i => i.leadId !== leadId))
+    if (!supabase) return
+    // ON DELETE CASCADE no schema apaga as interactions automaticamente.
+    // Orders.lead_id usa ON DELETE SET NULL — pedidos ficam órfãos por design.
+    const { error: err } = await supabase.from('leads').delete().eq('id', leadId)
+    if (err) {
+      console.warn('[useCrm] deleteLead error', err)
+      throw err
+    }
   }, [])
 
   const moveLeadStage: UseCrmResult['moveLeadStage'] = useCallback(async (leadId, stage) => {
@@ -196,6 +245,6 @@ export function useCrm(): UseCrmResult {
 
   return {
     leads, interactions, orders, loading, error, source,
-    reload: load, createLead, moveLeadStage, addInteraction,
+    reload: load, createLead, moveLeadStage, addInteraction, deleteLead,
   }
 }

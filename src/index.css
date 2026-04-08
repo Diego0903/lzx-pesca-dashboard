@@ -50,12 +50,12 @@
   --glass-border:  rgba(200, 165, 92, 0.16);
   --glass-border-strong: rgba(200, 165, 92, 0.32);
 
-  /* Sombras em camadas — efeito SaaS premium */
-  --shadow-sm:  0 1px 2px rgba(0,0,0,0.18), 0 1px 1px rgba(0,0,0,0.12);
-  --shadow-md:  0 4px 8px -2px rgba(0,0,0,0.32), 0 2px 4px -2px rgba(0,0,0,0.18);
-  --shadow-lg:  0 12px 28px -8px rgba(0,0,0,0.45), 0 4px 12px -4px rgba(0,0,0,0.22);
-  --shadow-xl:  0 24px 56px -16px rgba(0,0,0,0.55), 0 8px 20px -6px rgba(0,0,0,0.28);
-  --shadow-glow:0 0 0 1px var(--glass-border), 0 8px 24px -10px rgba(200,165,92,0.18);
+  /* Sombras simplificadas (1 camada por shadow — bem mais leve no GPU) */
+  --shadow-sm:  0 1px 2px rgba(0,0,0,0.20);
+  --shadow-md:  0 4px 12px rgba(0,0,0,0.30);
+  --shadow-lg:  0 10px 24px rgba(0,0,0,0.38);
+  --shadow-xl:  0 20px 40px rgba(0,0,0,0.45);
+  --shadow-glow:0 0 0 1px var(--glass-border), 0 6px 18px rgba(200,165,92,0.15);
   --glass-shadow: var(--shadow-lg);
 
   /* Tipografia */
@@ -109,20 +109,17 @@
   --glass-border-strong: rgba(160, 122, 35, 0.35);
 
   /* Sombras em camadas — mais quentes (tom bronze) e mais visíveis */
-  --shadow-sm:  0 1px 2px rgba(80, 55, 10, 0.06), 0 1px 2px rgba(80, 55, 10, 0.04);
-  --shadow-md:  0 4px 12px -2px rgba(80, 55, 10, 0.10), 0 2px 6px -2px rgba(80, 55, 10, 0.06);
-  --shadow-lg:  0 14px 32px -10px rgba(80, 55, 10, 0.18), 0 6px 14px -4px rgba(80, 55, 10, 0.10);
-  --shadow-xl:  0 28px 60px -18px rgba(80, 55, 10, 0.22), 0 10px 22px -6px rgba(80, 55, 10, 0.12);
-  --shadow-glow:0 0 0 1px var(--glass-border), 0 10px 28px -12px rgba(160, 122, 35, 0.32);
+  --shadow-sm:  0 1px 3px rgba(80, 55, 10, 0.08);
+  --shadow-md:  0 4px 14px rgba(80, 55, 10, 0.12);
+  --shadow-lg:  0 12px 28px rgba(80, 55, 10, 0.18);
+  --shadow-xl:  0 22px 50px rgba(80, 55, 10, 0.22);
+  --shadow-glow:0 0 0 1px var(--glass-border), 0 8px 22px rgba(160, 122, 35, 0.24);
   --glass-shadow: var(--shadow-lg);
 }
 
-/* Background ambient — gradiente quente no light mode */
-[data-theme="light"] body::before {
-  background:
-    radial-gradient(1000px 600px at 85% -10%, rgba(160, 122, 35, 0.08), transparent 60%),
-    radial-gradient(800px 500px at -10% 110%, rgba(37, 99, 235, 0.04), transparent 60%),
-    radial-gradient(600px 400px at 50% 50%, rgba(255, 250, 235, 0.4), transparent 70%);
+/* Background ambient — versão clara mais quente */
+[data-theme="light"] body {
+  background-image: radial-gradient(1200px 600px at 85% -20%, rgba(160, 122, 35, 0.06), transparent 70%);
 }
 
 body {
@@ -132,23 +129,19 @@ body {
   font-size: 14px;
   line-height: 1.5;
   min-height: 100vh;
-  transition: background 0.25s ease, color 0.25s ease;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  font-feature-settings: 'cv11', 'ss01', 'ss03';
   text-rendering: optimizeLegibility;
 }
 
-/* Background ambient — ponto dourado sutil radial atrás de tudo (só dark) */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  background:
-    radial-gradient(900px 500px at 85% -10%, rgba(200,165,92,0.05), transparent 60%),
-    radial-gradient(700px 400px at -10% 110%, rgba(77,138,245,0.04), transparent 60%);
+/* Background ambient — gradient leve direto no body (sem pseudo-element)
+   Desligado em prefers-reduced-motion ou em telas pequenas pra economizar GPU */
+body {
+  background-image: radial-gradient(1200px 600px at 85% -20%, rgba(200,165,92,0.04), transparent 70%);
+  background-attachment: fixed;
+}
+@media (max-width: 720px) {
+  body { background-image: none; }
 }
 
 #root { position: relative; z-index: 1; }
@@ -167,6 +160,10 @@ body::before {
 
 /* Numerais tabulares onde precisam ficar alinhados */
 .tabular { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
+
+/* CSS containment helpers — isolam repaints/reflows */
+.contain-layout { contain: layout style; }
+.contain-paint  { contain: layout style paint; }
 .font-display { font-family: var(--font-display); }
 .font-mono { font-family: var(--font-mono); }
 
@@ -205,22 +202,18 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .date-filter-dropdown { right: auto; left: 0; }
 }
 
-/* ── Glassmorphism — refinado SaaS premium ─────────── */
+/* ── Glassmorphism — otimizado para performance ─────── */
 .glass {
   position: relative;
   background: var(--glass-bg);
-  backdrop-filter: blur(16px) saturate(150%);
-  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border: 1px solid var(--glass-border);
   box-shadow: var(--shadow-md);
-  border-radius: 16px;
-  transition:
-    border-color 0.25s ease,
-    box-shadow 0.25s ease,
-    transform 0.25s ease,
-    background 0.25s ease;
+  border-radius: 14px;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
 }
-/* Highlight superior fino — efeito vidro */
+/* Highlight superior — só decorativo, não anima */
 .glass::before {
   content: '';
   position: absolute;
@@ -228,45 +221,43 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   height: 1px;
   background: linear-gradient(90deg, transparent, var(--glass-border-strong), transparent);
   pointer-events: none;
-  opacity: 0.7;
-  border-radius: 1px;
+  opacity: 0.6;
 }
 .glass-strong {
   background: var(--glass-bg-2);
-  backdrop-filter: blur(20px) saturate(170%);
-  -webkit-backdrop-filter: blur(20px) saturate(170%);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 .glass-hover { cursor: default; }
 .glass-hover:hover {
   border-color: var(--glass-border-strong);
-  box-shadow: var(--shadow-lg), 0 0 0 1px var(--glass-border-strong);
+  box-shadow: var(--shadow-lg);
   transform: translateY(-1px);
 }
 
-/* ── Stagger entrance animation ─────────────────────── */
+/* ── Stagger entrance animation — leve e curto ─────── */
 @keyframes slideUpFade {
-  from { opacity: 0; transform: translateY(14px); }
+  from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 .fade-in {
-  animation: slideUpFade 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: slideUpFade 0.28s ease-out both;
 }
 .stagger > * {
-  animation: slideUpFade 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: slideUpFade 0.28s ease-out both;
 }
-.stagger > *:nth-child(1) { animation-delay: 0.04s; }
-.stagger > *:nth-child(2) { animation-delay: 0.08s; }
-.stagger > *:nth-child(3) { animation-delay: 0.12s; }
-.stagger > *:nth-child(4) { animation-delay: 0.16s; }
-.stagger > *:nth-child(5) { animation-delay: 0.20s; }
-.stagger > *:nth-child(6) { animation-delay: 0.24s; }
-.stagger > *:nth-child(7) { animation-delay: 0.28s; }
-.stagger > *:nth-child(8) { animation-delay: 0.32s; }
-.stagger > *:nth-child(9) { animation-delay: 0.36s; }
+.stagger > *:nth-child(1) { animation-delay: 0.02s; }
+.stagger > *:nth-child(2) { animation-delay: 0.04s; }
+.stagger > *:nth-child(3) { animation-delay: 0.06s; }
+.stagger > *:nth-child(4) { animation-delay: 0.08s; }
+.stagger > *:nth-child(5) { animation-delay: 0.10s; }
+.stagger > *:nth-child(6) { animation-delay: 0.12s; }
+.stagger > *:nth-child(n+7) { animation-delay: 0.14s; }
 
 @media (prefers-reduced-motion: reduce) {
   .fade-in, .stagger > * { animation: none !important; }
   .glass, .glass-hover { transition: none !important; }
+  body { background-image: none !important; }
 }
 
 /* ── Top Section Nav — Desktop (Marketing · CRM · Pedidos) ────── */
@@ -275,8 +266,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   gap: 4px;
   align-items: center;
   background: var(--glass-bg);
-  backdrop-filter: blur(14px) saturate(150%);
-  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border: 1px solid var(--glass-border);
   border-radius: 14px;
   padding: 5px;
@@ -321,12 +312,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   bottom: 12px;
   z-index: 150;
   background: var(--glass-bg-2);
-  backdrop-filter: blur(22px) saturate(170%);
-  -webkit-backdrop-filter: blur(22px) saturate(170%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--glass-border);
   border-radius: 20px;
   padding: 6px;
-  box-shadow: var(--shadow-xl);
+  box-shadow: var(--shadow-lg);
   justify-content: space-around;
   gap: 4px;
 }
@@ -400,8 +391,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 .kanban-col {
   background: var(--glass-bg);
-  backdrop-filter: blur(14px) saturate(150%);
-  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border: 1px solid var(--glass-border);
   border-radius: 14px;
   padding: 14px;
@@ -409,8 +400,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   display: flex;
   flex-direction: column;
   gap: 10px;
-  transition: all 0.25s ease;
+  transition: background 0.15s, border-color 0.15s;
   box-shadow: var(--shadow-sm);
+  contain: layout style;
 }
 .kanban-col.drag-over {
   background: rgba(200,165,92,0.12);
@@ -436,20 +428,20 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   border-radius: 12px;
   padding: 12px 14px;
   cursor: grab;
-  transition: all 0.2s ease;
+  transition: border-color 0.15s, transform 0.15s;
   user-select: none;
   box-shadow: var(--shadow-sm);
+  contain: layout style;
 }
 .kanban-card:hover {
   border-color: var(--glass-border-strong);
-  box-shadow: var(--shadow-md);
   transform: translateY(-1px);
 }
 .kanban-card:active { cursor: grabbing; transform: translateY(0); }
 .kanban-card.dragging { opacity: 0.4; transform: scale(0.97); }
 
 /* ── Table — refinada ──────────────────────────────── */
-.data-table { width: 100%; border-collapse: collapse; }
+.data-table { width: 100%; border-collapse: collapse; contain: layout style; }
 .data-table th, .data-table td {
   padding: 12px 16px;
   text-align: left;

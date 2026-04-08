@@ -100,6 +100,8 @@ export default function App() {
   useEffect(() => {
     if (!isDono) { setPendentesCount(0); return }
     let active = true
+    let interval: ReturnType<typeof setInterval> | null = null
+
     const fetchCount = async () => {
       const { supabase } = await import('./lib/supabase')
       if (!supabase) return
@@ -109,10 +111,26 @@ export default function App() {
         .eq('status', 'pendente')
       if (active) setPendentesCount(count ?? 0)
     }
-    fetchCount()
-    const interval = setInterval(fetchCount, 30000)  // refresh a cada 30s
-    return () => { active = false; clearInterval(interval) }
-  }, [isDono, section])
+    const startPolling = () => {
+      if (interval) return
+      fetchCount()
+      interval = setInterval(fetchCount, 60000)  // 60s (era 30s — mais leve)
+    }
+    const stopPolling = () => {
+      if (interval) { clearInterval(interval); interval = null }
+    }
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') startPolling()
+      else stopPolling()
+    }
+    startPolling()
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      active = false
+      stopPolling()
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  }, [isDono])
 
   // Aplica tema
   useEffect(() => {

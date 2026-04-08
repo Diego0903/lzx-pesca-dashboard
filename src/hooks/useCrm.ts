@@ -150,18 +150,47 @@ export function useCrm(): UseCrmResult {
       setLoading(false)
       return
     }
+    const sb = supabase
     try {
+      // ── 1) Busca leads, interactions e orders em paralelo ──
+      // Importante: não usamos embed PostgREST aqui (creator:usuarios!fk)
+      // porque já tivemos travamentos misteriosos. Fazemos o join em JS.
       const [leadsRes, intRes, ordRes] = await Promise.all([
-        // Embed do criador via FK created_by → usuarios.id (para mostrar "cadastrado por X")
-        supabase.from('leads').select('*, creator:usuarios!leads_created_by_fkey(nome)').order('last_contact_at', { ascending: false }),
-        supabase.from('interactions').select('*').order('occurred_at', { ascending: false }),
-        supabase.from('orders').select('*').order('ordered_at', { ascending: false }),
+        sb.from('leads').select('*').order('last_contact_at', { ascending: false }),
+        sb.from('interactions').select('*').order('occurred_at', { ascending: false }),
+        sb.from('orders').select('*').order('ordered_at', { ascending: false }),
       ])
       if (leadsRes.error) throw leadsRes.error
       if (intRes.error)   throw intRes.error
       if (ordRes.error)   throw ordRes.error
 
-      setLeads((leadsRes.data ?? []).map(mapLead))
+      // ── 2) Resolve nomes dos criadores via segunda query ──
+      // (RLS garante que admin/dono leem todos; funcionário só lê o próprio)
+      const creatorIds = Array.from(new Set(
+        (leadsRes.data ?? [])
+          .map(l => l.created_by)
+          .filter((x): x is string => !!x)
+      ))
+      const creatorMap = new Map<string, string>()
+      if (creatorIds.length > 0) {
+        const { data: creatorRows, error: cErr } = await sb
+          .from('usuarios')
+          .select('id, nome')
+          .in('id', creatorIds)
+        if (!cErr && creatorRows) {
+          for (const r of creatorRows as Array<{ id: string; nome: string }>) {
+            creatorMap.set(r.id, r.nome)
+          }
+        }
+      }
+
+      // ── 3) Aplica o nome do criador no row antes de mapear ──
+      const leadsWithCreator = (leadsRes.data ?? []).map(l => ({
+        ...l,
+        creator: l.created_by ? { nome: creatorMap.get(l.created_by) ?? '' } : null,
+      }))
+
+      setLeads(leadsWithCreator.map(mapLead))
       setInteractions((intRes.data ?? []).map(mapInteraction))
       setOrders((ordRes.data ?? []).map(mapOrder))
       setSource('supabase')
@@ -209,9 +238,21 @@ export function useCrm(): UseCrmResult {
       next_follow_up_at: lead.nextFollowUpAt ?? null,
       recurring: lead.recurring,
       created_by: currentUserId,
-    }).select('*, creator:usuarios!leads_created_by_fkey(nome)').single()
+    }).select('*').single()
     if (err) throw err
-    if (data) setLeads(prev => [mapLead(data as LeadRow), ...prev])
+    if (data) {
+      // Resolve nome do criador localmente (em vez de embed PostgREST)
+      let creatorName: string | undefined
+      if (currentUserId) {
+        const { data: u } = await supabase.from('usuarios').select('nome').eq('id', currentUserId).maybeSingle()
+        creatorName = u?.nome ?? undefined
+      }
+      const enriched: LeadRow = {
+        ...(data as LeadRow),
+        creator: creatorName ? { nome: creatorName } : null,
+      }
+      setLeads(prev => [mapLead(enriched), ...prev])
+    }
   }, [])
 
   const deleteLead: UseCrmResult['deleteLead'] = useCallback(async (leadId) => {

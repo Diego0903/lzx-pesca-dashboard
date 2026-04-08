@@ -120,7 +120,8 @@ export default function WhatsAppSection({ insights }: Props) {
               <XAxis type="number" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
               <YAxis type="category" dataKey="name" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} width={160} />
               <Tooltip
-                contentStyle={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12 }}
+                cursor={{ fill: 'rgba(200,165,92,0.08)' }}
+                contentStyle={{ background: 'var(--surface2)', border: '1px solid var(--gold)', borderRadius: 8, fontSize: 12, boxShadow: 'var(--shadow-lg)' }}
                 formatter={(value: number, _: string, entry: { payload?: { fullName?: string; spend?: number; costPerMsg?: number } }) => [
                   <div key="tip">
                     <div>{value.toLocaleString('pt-BR')} conversas</div>

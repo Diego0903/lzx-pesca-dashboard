@@ -183,10 +183,14 @@ export function useAuth() {
 function traduzErroSupabase(msg: string): string {
   const m = msg.toLowerCase()
   if (m.includes('invalid login') || m.includes('invalid credentials')) return 'Email ou senha incorretos.'
-  if (m.includes('email not confirmed')) return 'Email ainda não confirmado.'
+  if (m.includes('email logins are disabled') || m.includes('email_provider_disabled')) {
+    return 'Login por email está desabilitado no Supabase. Vá em Authentication → Providers → Email → ative o toggle "Enable Email provider".'
+  }
+  if (m.includes('email not confirmed')) return 'Email ainda não confirmado. Aguarde a aprovação do administrador.'
   if (m.includes('user already registered') || m.includes('already exists')) return 'Já existe uma conta com esse email.'
   if (m.includes('password should be') || m.includes('weak password')) return 'A senha precisa ter no mínimo 8 caracteres.'
   if (m.includes('rate limit') || m.includes('too many')) return 'Muitas tentativas. Aguarde 1 minuto e tente novamente.'
-  if (m.includes('email')) return 'Email inválido.'
-  return msg
+  if (m.includes('signup') && m.includes('disabled')) return 'Cadastro de novos usuários está desabilitado no Supabase.'
+  if (m.includes('email address') && m.includes('invalid')) return 'Email inválido.'
+  return `Erro: ${msg}`
 }

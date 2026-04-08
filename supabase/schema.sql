@@ -10,7 +10,7 @@ do $$ begin
 exception when duplicate_object then null; end $$;
 
 do $$ begin
-  create type lead_origin as enum ('Google','Instagram','Facebook','Indicação','WhatsApp');
+  create type lead_origin as enum ('Google','Instagram','Facebook','Indicação','WhatsApp','Cliente Recorrente','Desconhecido');
 exception when duplicate_object then null; end $$;
 
 do $$ begin
@@ -36,8 +36,9 @@ create table if not exists public.leads (
   product             text,                       -- legacy single-product (mantido por compat)
   category            product_category,           -- legacy single-category
   estimated_qty       integer default 0,
-  estimated_value     numeric(12,2) default 0,    -- subtotal dos itens
-  items               jsonb default '[]'::jsonb,  -- [{product, category, qty, value}]
+  estimated_value     numeric(12,2) default 0,    -- legacy: total geral (order_total + shipping_value)
+  order_total         numeric(12,2) default 0,    -- valor do pedido (sem frete)
+  items               jsonb default '[]'::jsonb,  -- [{product, category, qty}]
   shipping_value      numeric(12,2) default 0,    -- frete
   origin              lead_origin,
   stage               lead_stage default 'novo',

@@ -2,7 +2,7 @@
 // Centraliza Leads, Clientes, Pedidos, Interações e dimensões agregadas
 
 export type LeadStage = 'novo' | 'qualificado' | 'orcamento' | 'negociacao' | 'fechado' | 'perdido'
-export type LeadOrigin = 'Google' | 'Instagram' | 'Facebook' | 'Indicação' | 'WhatsApp'
+export type LeadOrigin = 'Google' | 'Instagram' | 'Facebook' | 'Indicação' | 'WhatsApp' | 'Cliente Recorrente' | 'Desconhecido'
 export type ContactType = 'WhatsApp' | 'Email' | 'Ligação' | 'Visita'
 export type OrderStatus = 'novo' | 'andamento' | 'fechado'
 export type ProductCategory = 'Redes' | 'Linhas' | 'Tralhas' | 'Cordas' | 'Boias'
@@ -12,7 +12,7 @@ export interface LeadItem {
   product: string
   category: ProductCategory
   qty: number
-  value: number  // total monetário desta linha (R$)
+  // Sem valor por item — o valor é do pedido inteiro (orderTotal no Lead).
 }
 
 export interface Lead {
@@ -21,14 +21,15 @@ export interface Lead {
   whatsapp: string
   city: string
   state: BrazilState
-  // ── Estrutura nova: múltiplos produtos por lead + frete ──
+  // ── Estrutura: múltiplos produtos por lead, valor único do pedido + frete ──
   items: LeadItem[]
-  shippingValue: number   // valor do frete em R$
+  orderTotal: number      // valor do pedido (sem frete) em R$
+  shippingValue: number   // frete em R$
   // ── Campos derivados (computed) — mantidos para retro-compat com kanban/lista ──
   product: string         // = items.map(i => i.product).join(' · ')
   category: ProductCategory  // = items[0]?.category ?? 'Redes'
   estimatedQty: number    // = sum(items.qty)
-  estimatedValue: number  // = sum(items.value) + shippingValue
+  estimatedValue: number  // = orderTotal + shippingValue
   origin: LeadOrigin
   stage: LeadStage
   lastContactAt: string  // ISO

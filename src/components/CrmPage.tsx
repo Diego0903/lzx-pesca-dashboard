@@ -112,7 +112,6 @@ interface ItemFormState {
   product: string
   category: ProductCategory
   qty: string
-  value: string
 }
 
 interface LeadFormState {
@@ -122,16 +121,20 @@ interface LeadFormState {
   state: BrazilState
   origin: LeadOrigin
   items: ItemFormState[]
+  orderTotal: string
   shippingValue: string
 }
 
-const EMPTY_ITEM: ItemFormState = { product: '', category: 'Redes', qty: '', value: '' }
+const EMPTY_ITEM: ItemFormState = { product: '', category: 'Redes', qty: '' }
 
 const EMPTY_FORM: LeadFormState = {
-  name: '', whatsapp: '', city: '', state: 'SC', origin: 'Google',
+  name: '', whatsapp: '', city: '', state: 'SC', origin: 'Desconhecido',
   items: [{ ...EMPTY_ITEM }],
+  orderTotal: '',
   shippingValue: '',
 }
+
+const ORIGIN_OPTIONS: LeadOrigin[] = ['Google','Instagram','Facebook','WhatsApp','Indicação','Cliente Recorrente','Desconhecido']
 
 interface ListProps {
   leads: Lead[]
@@ -338,9 +341,9 @@ function NewLeadForm({ onCreate }: FormProps) {
   const removeItem = (idx: number) =>
     setForm(f => ({ ...f, items: f.items.length > 1 ? f.items.filter((_, i) => i !== idx) : f.items }))
 
-  const subtotal = form.items.reduce((s, it) => s + (parseFloat(it.value || '0') || 0), 0)
+  const orderTotal = parseFloat(form.orderTotal || '0') || 0
   const frete = parseFloat(form.shippingValue || '0') || 0
-  const total = subtotal + frete
+  const totalGeral = orderTotal + frete
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
@@ -351,7 +354,6 @@ function NewLeadForm({ onCreate }: FormProps) {
         product: it.product.trim(),
         category: it.category,
         qty: parseInt(it.qty || '0') || 0,
-        value: parseFloat(it.value || '0') || 0,
       }))
       .filter(it => it.product.length > 0)
 
@@ -367,30 +369,31 @@ function NewLeadForm({ onCreate }: FormProps) {
       city: form.city.trim(),
       state: form.state,
       items,
+      orderTotal,
       shippingValue: frete,
-      // Campos derivados (o useCrm também recalcula no salvamento)
+      // Campos derivados
       product: items.map(i => i.product).join(' · '),
       category: items[0].category,
       estimatedQty: items.reduce((s, it) => s + it.qty, 0),
-      estimatedValue: items.reduce((s, it) => s + it.value, 0) + frete,
+      estimatedValue: totalGeral,
       origin: form.origin,
       stage: 'novo',
       lastContactAt: new Date().toISOString(),
       nextFollowUpAt: new Date(Date.now() + 2 * 86400000).toISOString(),
-      recurring: false,
+      recurring: form.origin === 'Cliente Recorrente',
     }
     onCreate(newLead)
     setForm(EMPTY_FORM)
   }
 
   return (
-    <form onSubmit={handleSubmit} className="glass" style={{ padding: 20 }}>
-      <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 700, fontSize: 13, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 14 }}>
+    <form onSubmit={handleSubmit} className="glass lead-form" style={{ padding: 20 }}>
+      <div style={{ fontFamily: "'Manrope','Rubik',sans-serif", fontWeight: 700, fontSize: 12, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>
         + Novo Lead
       </div>
 
       {/* Dados básicos */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 18 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(160px, 100%), 1fr))', gap: 12, marginBottom: 18 }}>
         <div className="field">
           <label htmlFor="lf-name">Nome</label>
           <input id="lf-name" required value={form.name} onChange={e => update('name', e.target.value)} placeholder="Cliente ou empresa" />
@@ -412,7 +415,7 @@ function NewLeadForm({ onCreate }: FormProps) {
         <div className="field">
           <label htmlFor="lf-origin">Origem</label>
           <select id="lf-origin" value={form.origin} onChange={e => update('origin', e.target.value as LeadOrigin)}>
-            {(['Google','Instagram','Facebook','Indicação','WhatsApp'] as LeadOrigin[]).map(o => <option key={o} value={o}>{o}</option>)}
+            {ORIGIN_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
           </select>
         </div>
       </div>
@@ -432,16 +435,7 @@ function NewLeadForm({ onCreate }: FormProps) {
           {form.items.map((item, idx) => (
             <div
               key={idx}
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'minmax(180px, 2fr) minmax(120px, 1fr) minmax(80px, 0.7fr) minmax(110px, 1fr) auto',
-                gap: 8,
-                alignItems: 'end',
-                background: 'rgba(196,163,90,0.04)',
-                border: '1px solid var(--border)',
-                borderRadius: 10,
-                padding: 12,
-              }}
+              className="lead-item-row"
             >
               <div className="field">
                 <label htmlFor={`lf-prod-${idx}`}>Produto {idx + 1}</label>
@@ -470,18 +464,6 @@ function NewLeadForm({ onCreate }: FormProps) {
                   min={0}
                   value={item.qty}
                   onChange={e => updateItem(idx, { qty: e.target.value })}
-                />
-              </div>
-              <div className="field">
-                <label htmlFor={`lf-val-${idx}`}>Valor (R$)</label>
-                <input
-                  id={`lf-val-${idx}`}
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={item.value}
-                  onChange={e => updateItem(idx, { value: e.target.value })}
-                  placeholder="0,00"
                 />
               </div>
               <button
@@ -517,17 +499,29 @@ function NewLeadForm({ onCreate }: FormProps) {
         </button>
       </div>
 
-      {/* Frete + Totais */}
+      {/* Valor do pedido + Frete + Total */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(min(160px, 100%), 1fr))',
         gap: 12,
         padding: 14,
-        background: 'rgba(196,163,90,0.06)',
+        background: 'rgba(200,165,92,0.06)',
         border: '1px solid var(--glass-border)',
-        borderRadius: 10,
+        borderRadius: 12,
         marginBottom: 14,
       }}>
+        <div className="field">
+          <label htmlFor="lf-order-total">Valor do pedido (R$)</label>
+          <input
+            id="lf-order-total"
+            type="number"
+            min={0}
+            step="0.01"
+            value={form.orderTotal}
+            onChange={e => update('orderTotal', e.target.value)}
+            placeholder="0,00"
+          />
+        </div>
         <div className="field">
           <label htmlFor="lf-frete">Valor do frete (R$)</label>
           <input
@@ -541,12 +535,9 @@ function NewLeadForm({ onCreate }: FormProps) {
           />
         </div>
         <div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Subtotal produtos</div>
-          <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>{fmtBRL(subtotal)}</div>
-        </div>
-        <div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Total do pedido</div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--gold)' }}>{fmtBRL(total)}</div>
+          <div className="font-display" style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>Total geral</div>
+          <div className="font-display tabular" style={{ fontSize: 24, fontWeight: 700, color: 'var(--gold)', letterSpacing: '-0.02em', lineHeight: 1.1 }}>{fmtBRL(totalGeral)}</div>
+          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>pedido + frete</div>
         </div>
       </div>
 
@@ -597,40 +588,46 @@ function MiniDashboard({ leads }: { leads: Lead[] }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 16 }}>
       {/* KPIs em linha */}
-      <div className="glass" style={{ padding: '18px 20px' }}>
-        <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500, marginBottom: 6 }}>Pipeline aberto</div>
-        <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--gold)' }}>{fmtBRL(totalPipeline)}</div>
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{leads.filter(l => l.stage !== 'perdido' && l.stage !== 'fechado').length} leads ativos</div>
+      <div className="glass glass-hover" style={{ padding: '20px 22px' }}>
+        <div className="font-display" style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Pipeline aberto</div>
+        <div className="font-display tabular" style={{ fontSize: 28, fontWeight: 700, color: 'var(--gold)', letterSpacing: '-0.02em', lineHeight: 1.1 }}>{fmtBRL(totalPipeline)}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, fontWeight: 500 }}>{leads.filter(l => l.stage !== 'perdido' && l.stage !== 'fechado').length} leads ativos</div>
       </div>
-      <div className="glass" style={{ padding: '18px 20px', borderColor: openOverdue.length > 0 ? 'rgba(220,38,38,0.4)' : undefined }}>
-        <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div className="glass glass-hover" style={{ padding: '20px 22px', borderColor: openOverdue.length > 0 ? 'rgba(216,86,86,0.4)' : undefined }}>
+        <div className="font-display" style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
           <span aria-hidden="true">⚠</span> Sem contato {'>'}3 dias
         </div>
-        <div style={{ fontSize: 26, fontWeight: 700, color: openOverdue.length > 0 ? 'var(--trust-red)' : 'var(--trust-green)' }}>{fmtNum(openOverdue.length)}</div>
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>requer follow-up urgente</div>
+        <div className="font-display tabular" style={{ fontSize: 28, fontWeight: 700, color: openOverdue.length > 0 ? 'var(--trust-red)' : 'var(--trust-green)', letterSpacing: '-0.02em', lineHeight: 1.1 }}>{fmtNum(openOverdue.length)}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, fontWeight: 500 }}>requer follow-up urgente</div>
       </div>
-      <div className="glass" style={{ padding: '18px 20px' }}>
-        <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500, marginBottom: 6 }}>Total de leads</div>
-        <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--trust-blue)' }}>{fmtNum(leads.length)}</div>
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{leads.filter(l => l.recurring).length} recorrentes</div>
+      <div className="glass glass-hover" style={{ padding: '20px 22px' }}>
+        <div className="font-display" style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Total de leads</div>
+        <div className="font-display tabular" style={{ fontSize: 28, fontWeight: 700, color: 'var(--trust-blue)', letterSpacing: '-0.02em', lineHeight: 1.1 }}>{fmtNum(leads.length)}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, fontWeight: 500 }}>{leads.filter(l => l.recurring).length} recorrentes</div>
       </div>
 
       {/* Bar chart de origens */}
       {leadsBySource.length > 0 && (
         <div className="glass" style={{ padding: 20, gridColumn: '1 / -1' }}>
-          <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 700, fontSize: 13, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 14 }}>
+          <div style={{ fontFamily: "'Manrope','Rubik',sans-serif", fontWeight: 700, fontSize: 12, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>
             Leads por Fonte
           </div>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={leadsBySource} layout="vertical" margin={{ top: 4, right: 12, left: 12, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-              <XAxis type="number" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis type="category" dataKey="source" tick={{ fill: 'var(--text-muted)', fontSize: 12 }} axisLine={false} tickLine={false} width={90} />
+          <ResponsiveContainer width="100%" height={210}>
+            <BarChart data={leadsBySource} layout="vertical" margin={{ top: 8, right: 12, left: 12, bottom: 0 }}>
+              <defs>
+                <linearGradient id="barBlue" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="#2e5fcd" stopOpacity={0.85}/>
+                  <stop offset="100%" stopColor="#4d8af5" stopOpacity={0.95}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="2 4" stroke="var(--border)" horizontal={false} />
+              <XAxis type="number" tick={{ fill: 'var(--text-muted)', fontSize: 11, fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} />
+              <YAxis type="category" dataKey="source" tick={{ fill: 'var(--text-muted)', fontSize: 11, fontFamily: 'Manrope', fontWeight: 500 }} axisLine={false} tickLine={false} width={110} />
               <Tooltip
-                cursor={{ fill: 'rgba(196,163,90,0.06)' }}
-                contentStyle={{ background: 'var(--surface2)', border: '1px solid var(--gold)', borderRadius: 8, fontSize: 12 }}
+                cursor={{ fill: 'rgba(77,138,245,0.08)' }}
+                contentStyle={{ background: 'var(--surface2)', border: '1px solid var(--gold)', borderRadius: 10, fontSize: 12, boxShadow: 'var(--shadow-lg)' }}
               />
-              <Bar dataKey="leads" fill="#3b82f6" radius={[0, 6, 6, 0]} />
+              <Bar dataKey="leads" fill="url(#barBlue)" radius={[0, 8, 8, 0]} maxBarSize={28} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -639,16 +636,22 @@ function MiniDashboard({ leads }: { leads: Lead[] }) {
       {/* Close rate por categoria */}
       {closeRateByCategory.length > 0 && (
         <div className="glass" style={{ padding: 20, gridColumn: '1 / -1' }}>
-          <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 700, fontSize: 13, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 14 }}>
+          <div style={{ fontFamily: "'Manrope','Rubik',sans-serif", fontWeight: 700, fontSize: 12, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>
             Taxa de Fechamento por Categoria
           </div>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={closeRateByCategory} margin={{ top: 4, right: 12, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis dataKey="categoria" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} width={40} unit="%" />
-              <Tooltip cursor={{ fill: 'rgba(196,163,90,0.06)' }} contentStyle={{ background: 'var(--surface2)', border: '1px solid var(--gold)', borderRadius: 8, fontSize: 12 }} formatter={(v) => `${v}%`} />
-              <Bar dataKey="taxa" fill="#16a34a" radius={[6, 6, 0, 0]} />
+          <ResponsiveContainer width="100%" height={210}>
+            <BarChart data={closeRateByCategory} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="barGreen" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#5fb85a" stopOpacity={0.95}/>
+                  <stop offset="100%" stopColor="#3f8a3a" stopOpacity={0.85}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="2 4" stroke="var(--border)" vertical={false} />
+              <XAxis dataKey="categoria" tick={{ fill: 'var(--text-muted)', fontSize: 11, fontFamily: 'Manrope' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 11, fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} width={42} unit="%" />
+              <Tooltip cursor={{ fill: 'rgba(95,184,90,0.08)' }} contentStyle={{ background: 'var(--surface2)', border: '1px solid var(--gold)', borderRadius: 10, fontSize: 12, boxShadow: 'var(--shadow-lg)' }} formatter={(v) => `${v}%`} />
+              <Bar dataKey="taxa" fill="url(#barGreen)" radius={[8, 8, 0, 0]} maxBarSize={56} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -709,7 +712,7 @@ export default function CrmPage() {
       <MiniDashboard leads={leads} />
 
       <div style={{ marginBottom: 20 }}>
-        <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 700, fontSize: 14, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>
+        <div style={{ fontFamily: "'Manrope','Rubik',sans-serif", fontWeight: 700, fontSize: 12, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 14 }}>
           Pipeline de Vendas
         </div>
         <Kanban leads={leads} onMove={(id, to) => void moveLeadStage(id, to)} onSelect={setSelected} selectedId={effectiveSelected?.id} />

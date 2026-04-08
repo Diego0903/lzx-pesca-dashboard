@@ -163,22 +163,22 @@ export default function App() {
           <img
             src="/logo.webp"
             alt="LZX Pesca"
-            style={{ height: 36, objectFit: 'contain', display: 'block' }}
+            style={{ height: 34, width: 'auto', objectFit: 'contain', display: 'block', flexShrink: 0 }}
           />
-          <div className="header-divider" style={{ width: 1, height: 32, background: 'rgba(196,163,90,0.25)' }} />
+          <div className="header-divider" style={{ width: 1, height: 32, background: 'var(--glass-border)' }} />
           <div className="header-title-text">
-            <div style={{
-              fontFamily: "'Rubik', sans-serif",
-              fontWeight: 600,
+            <div className="font-display" style={{
+              fontWeight: 700,
               fontSize: 13,
               color: 'var(--gold)',
-              letterSpacing: '0.08em',
+              letterSpacing: '0.1em',
               textTransform: 'uppercase',
+              lineHeight: 1.2,
             }}>
-              Dashboard Meta Ads
+              LZX Pesca
             </div>
-            <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>
-              Gestão de Campanhas
+            <div style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 500, marginTop: 1 }}>
+              Painel de Gestão · B2B
             </div>
           </div>
         </div>

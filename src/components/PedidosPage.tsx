@@ -53,7 +53,7 @@ const STATUS_LABEL: Record<OrderStatus, { label: string; cls: string }> = {
   fechado:   { label: 'Fechado',     cls: 'badge badge-green' },
 }
 
-const CHART_COLORS = ['#c4a35a', '#3b82f6', '#16a34a', '#a855f7', '#f97316', '#ee5a4a']
+const CHART_COLORS = ['#c8a55c', '#4d8af5', '#5fb85a', '#9d6fdb', '#ed8936', '#d65656', '#4ea5b8']
 
 interface KpiProps {
   icon: string
@@ -65,13 +65,13 @@ interface KpiProps {
 
 function KpiCard({ icon, label, value, sub, color = 'var(--gold)' }: KpiProps) {
   return (
-    <div className="glass glass-hover" style={{ padding: '18px 20px', flex: '1 1 180px', minWidth: 180 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-        <span style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 500 }}>{label}</span>
-        <span style={{ fontSize: 20 }} aria-hidden="true">{icon}</span>
+    <div className="glass glass-hover" style={{ padding: '20px 22px', flex: '1 1 190px', minWidth: 190 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+        <span className="font-display" style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</span>
+        <span style={{ fontSize: 18, opacity: 0.9 }} aria-hidden="true">{icon}</span>
       </div>
-      <div style={{ fontSize: 26, fontWeight: 700, color, letterSpacing: '-0.5px' }}>{value}</div>
-      {sub && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.4 }}>{sub}</div>}
+      <div className="font-display tabular" style={{ fontSize: 28, fontWeight: 700, color, letterSpacing: '-0.02em', lineHeight: 1.1 }}>{value}</div>
+      {sub && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5, fontWeight: 500 }}>{sub}</div>}
     </div>
   )
 }
@@ -145,7 +145,7 @@ export default function PedidosPage() {
       {orders.length === 0 ? (
         <div className="glass" style={{ padding: '60px 24px', textAlign: 'center', marginBottom: 24 }}>
           <div style={{ fontSize: 48, marginBottom: 12 }} aria-hidden="true">📦</div>
-          <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 700, fontSize: 16, color: 'var(--text)', marginBottom: 6 }}>
+          <div style={{ fontFamily: "'Manrope','Rubik',sans-serif", fontWeight: 700, fontSize: 17, color: 'var(--text)', marginBottom: 6, letterSpacing: '-0.01em' }}>
             Nenhum pedido cadastrado ainda
           </div>
           <div style={{ fontSize: 13, color: 'var(--text-muted)', maxWidth: 420, margin: '0 auto' }}>
@@ -157,32 +157,46 @@ export default function PedidosPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 16, marginBottom: 16 }}>
         {/* Receita por mês */}
         <div className="glass" style={{ padding: 20 }}>
-          <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 700, fontSize: 13, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 14 }}>
+          <div style={{ fontWeight: 700, fontSize: 12, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16, fontFamily: "'Manrope','Rubik',sans-serif" }}>
             Receita Mensal · 6 meses
           </div>
-          <ResponsiveContainer width="100%" height={240}>
-            <LineChart data={monthlyRevenue} margin={{ top: 4, right: 12, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis dataKey="month" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={{ stroke: 'var(--border)' }} tickLine={false} />
-              <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} width={60} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
-              <Tooltip content={<ChartTooltip fmt={fmtBRL} />} />
-              <Line type="monotone" dataKey="receita" name="Receita" stroke="#c4a35a" strokeWidth={3} dot={{ r: 4, fill: '#c4a35a' }} activeDot={{ r: 6 }} />
+          <ResponsiveContainer width="100%" height={250}>
+            <LineChart data={monthlyRevenue} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="lineGoldGlow" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#e0c187" stopOpacity={1}/>
+                  <stop offset="100%" stopColor="#8a6e2e" stopOpacity={1}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="2 4" stroke="var(--border)" vertical={false} />
+              <XAxis dataKey="month" tick={{ fill: 'var(--text-muted)', fontSize: 11, fontFamily: 'Manrope' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 11, fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} width={56} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
+              <Tooltip content={<ChartTooltip fmt={fmtBRL} />} cursor={{ stroke: 'var(--gold)', strokeWidth: 1, strokeDasharray: '3 3' }} />
+              <Line
+                type="monotone"
+                dataKey="receita"
+                name="Receita"
+                stroke="url(#lineGoldGlow)"
+                strokeWidth={2.5}
+                dot={{ r: 4, fill: '#c8a55c', strokeWidth: 2, stroke: 'var(--bg)' }}
+                activeDot={{ r: 6, fill: '#e0c187', strokeWidth: 2, stroke: 'var(--bg)' }}
+              />
             </LineChart>
           </ResponsiveContainer>
         </div>
 
         {/* Distribuição por estado (donut) */}
         <div className="glass" style={{ padding: 20 }}>
-          <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 700, fontSize: 13, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 14 }}>
+          <div style={{ fontWeight: 700, fontSize: 12, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16, fontFamily: "'Manrope','Rubik',sans-serif" }}>
             Pedidos por Estado
           </div>
-          <ResponsiveContainer width="100%" height={240}>
+          <ResponsiveContainer width="100%" height={250}>
             <PieChart>
-              <Pie data={ordersByState} dataKey="pedidos" nameKey="estado" cx="50%" cy="50%" innerRadius={56} outerRadius={92} paddingAngle={3}>
-                {ordersByState.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} stroke="none" />)}
+              <Pie data={ordersByState} dataKey="pedidos" nameKey="estado" cx="50%" cy="50%" innerRadius={62} outerRadius={96} paddingAngle={4} strokeWidth={2} stroke="var(--bg-elev)">
+                {ordersByState.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
               </Pie>
               <Tooltip content={<ChartTooltip fmt={v => `${v} pedidos`} />} />
-              <Legend verticalAlign="bottom" iconType="circle" wrapperStyle={{ fontSize: 12, color: 'var(--text-muted)' }} />
+              <Legend verticalAlign="bottom" iconType="circle" wrapperStyle={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'Manrope', fontWeight: 500, paddingTop: 8 }} />
             </PieChart>
           </ResponsiveContainer>
         </div>
@@ -190,17 +204,23 @@ export default function PedidosPage() {
 
       {/* Charts row 2 — sales by category */}
       <div className="glass" style={{ padding: 20, marginBottom: 24 }}>
-        <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 700, fontSize: 13, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 14 }}>
+        <div style={{ fontWeight: 700, fontSize: 12, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16, fontFamily: "'Manrope','Rubik',sans-serif" }}>
           Produtos Vendidos por Categoria
         </div>
-        <ResponsiveContainer width="100%" height={260}>
-          <BarChart data={salesByCategory} margin={{ top: 4, right: 12, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-            <XAxis dataKey="categoria" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={{ stroke: 'var(--border)' }} tickLine={false} />
-            <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} width={50} />
-            <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(196,163,90,0.08)' }} />
-            <Legend wrapperStyle={{ fontSize: 12, color: 'var(--text-muted)' }} />
-            <Bar dataKey="vendas" name="Unidades vendidas" fill="#c4a35a" radius={[6, 6, 0, 0]} />
+        <ResponsiveContainer width="100%" height={270}>
+          <BarChart data={salesByCategory} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+            <defs>
+              <linearGradient id="barGold" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#e0c187" stopOpacity={0.95}/>
+                <stop offset="100%" stopColor="#8a6e2e" stopOpacity={0.85}/>
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="2 4" stroke="var(--border)" vertical={false} />
+            <XAxis dataKey="categoria" tick={{ fill: 'var(--text-muted)', fontSize: 11, fontFamily: 'Manrope' }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 11, fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} width={48} />
+            <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(200,165,92,0.08)' }} />
+            <Legend wrapperStyle={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'Manrope', fontWeight: 500 }} />
+            <Bar dataKey="vendas" name="Unidades vendidas" fill="url(#barGold)" radius={[8, 8, 0, 0]} maxBarSize={56} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -209,8 +229,8 @@ export default function PedidosPage() {
       {/* Tabela de pedidos */}
       <div className="glass" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', borderBottom: '1px solid var(--glass-border)', flexWrap: 'wrap', gap: 10 }}>
-          <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 700, fontSize: 14, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Pedidos Recentes <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 12, textTransform: 'none' }}>({filtered.length})</span>
+          <div className="font-display" style={{ fontWeight: 700, fontSize: 12, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+            Pedidos Recentes <span className="tabular" style={{ color: 'var(--text-muted)', fontWeight: 500, fontSize: 12, textTransform: 'none', letterSpacing: 0, marginLeft: 4 }}>({filtered.length})</span>
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {([

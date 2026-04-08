@@ -13,7 +13,8 @@ interface LeadRow {
   category: string | null
   estimated_qty: number | null
   estimated_value: number | null
-  items: LeadItem[] | null
+  order_total: number | null
+  items: Array<{ product?: string; category?: string; qty?: number }> | null
   shipping_value: number | null
   origin: string | null
   stage: string | null
@@ -46,26 +47,28 @@ interface OrderRow {
 // ── Mappers row → app type ─────────────────────────────────────
 const mapLead = (r: LeadRow): Lead => {
   // Items vem do JSONB; se o registro for legacy (sem items), tenta reconstruir
-  // a partir dos campos antigos product/category/estimated_qty/estimated_value
+  // a partir dos campos antigos product/category/estimated_qty
   const rawItems = Array.isArray(r.items) ? r.items : []
   const items: LeadItem[] = rawItems.length > 0
     ? rawItems.map(it => ({
         product: String(it.product ?? ''),
         category: (it.category as ProductCategory) ?? 'Redes',
         qty: Number(it.qty ?? 0),
-        value: Number(it.value ?? 0),
       }))
     : (r.product
         ? [{
             product: r.product,
             category: (r.category as ProductCategory) ?? 'Redes',
             qty: r.estimated_qty ?? 0,
-            value: Number(r.estimated_value ?? 0),
           }]
         : [])
 
   const shippingValue = Number(r.shipping_value ?? 0)
-  const subtotal = items.reduce((s, it) => s + it.value, 0)
+  // order_total é o valor do pedido sem frete; se não existir (registro antigo),
+  // tenta deduzir de estimated_value - shipping_value
+  const orderTotal = r.order_total != null
+    ? Number(r.order_total)
+    : Math.max(0, Number(r.estimated_value ?? 0) - shippingValue)
 
   return {
     id: r.id,
@@ -74,13 +77,14 @@ const mapLead = (r: LeadRow): Lead => {
     city: r.city ?? '',
     state: (r.state as Lead['state']) ?? 'Outros',
     items,
+    orderTotal,
     shippingValue,
     // Campos derivados (mantidos para retro-compat com kanban/lista)
     product: items.map(i => i.product).filter(Boolean).join(' · ') || (r.product ?? ''),
     category: items[0]?.category ?? (r.category as Lead['category']) ?? 'Redes',
     estimatedQty: items.reduce((s, it) => s + it.qty, 0) || (r.estimated_qty ?? 0),
-    estimatedValue: subtotal + shippingValue || Number(r.estimated_value ?? 0),
-    origin: (r.origin as Lead['origin']) ?? 'Google',
+    estimatedValue: orderTotal + shippingValue,
+    origin: (r.origin as Lead['origin']) ?? 'Desconhecido',
     stage: (r.stage as LeadStage) ?? 'novo',
     lastContactAt: r.last_contact_at ?? new Date().toISOString(),
     nextFollowUpAt: r.next_follow_up_at ?? undefined,
@@ -173,20 +177,21 @@ export function useCrm(): UseCrmResult {
       setLeads(prev => [local, ...prev])
       return
     }
-    const subtotal = lead.items.reduce((s, it) => s + it.value, 0)
+    const totalGeral = lead.orderTotal + lead.shippingValue
     const { data, error: err } = await supabase.from('leads').insert({
       name: lead.name,
       whatsapp: lead.whatsapp,
       city: lead.city,
       state: lead.state,
-      // Multi-item structure
+      // Multi-item structure (sem valor por item)
       items: lead.items,
+      order_total: lead.orderTotal,
       shipping_value: lead.shippingValue,
       // Legacy mirror for retro-compat / first item
       product: lead.items.map(i => i.product).filter(Boolean).join(' · ') || lead.product,
       category: lead.items[0]?.category ?? lead.category,
       estimated_qty: lead.items.reduce((s, it) => s + it.qty, 0),
-      estimated_value: subtotal,
+      estimated_value: totalGeral,
       origin: lead.origin,
       stage: lead.stage,
       last_contact_at: lead.lastContactAt,

@@ -41,7 +41,19 @@ export default function AppRoot() {
     return <LoginPage />
   }
 
-  // Autenticado mas sem linha em usuarios (improvável — trigger cria)
+  // Autenticado mas usuario ainda está sendo buscado (undefined = pending)
+  if (usuario === undefined) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>⏳</div>
+          <div style={{ fontSize: 13 }}>Carregando perfil...</div>
+        </div>
+      </div>
+    )
+  }
+
+  // Autenticado mas usuario===null — busca completou e não achou linha em usuarios
   if (!usuario) {
     return <AccessBlocked title="Conta não encontrada" message="Não conseguimos carregar o seu perfil. Tente sair e entrar novamente." onSignOut={signOut} />
   }

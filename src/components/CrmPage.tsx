@@ -1,7 +1,4 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-} from 'recharts'
 import type {
   Lead, LeadItem, LeadStage, LeadOrigin, ContactType, Interaction, ProductCategory, BrazilState,
 } from '../data/mockCrm'
@@ -593,38 +590,8 @@ function MiniDashboard({ leads }: { leads: Lead[] }) {
   })
   const totalPipeline = leads.filter(l => l.stage !== 'perdido' && l.stage !== 'fechado').reduce((s, l) => s + l.estimatedValue, 0)
 
-  // Leads agrupados por origem (derivado dos leads reais)
-  const leadsBySource = useMemo(() => {
-    const map = new Map<string, number>()
-    for (const l of leads) map.set(l.origin, (map.get(l.origin) ?? 0) + 1)
-    return Array.from(map.entries())
-      .map(([source, leads]) => ({ source, leads }))
-      .sort((a, b) => b.leads - a.leads)
-  }, [leads])
-
-  // Taxa de fechamento por categoria — itera todos os items dos leads
-  // (um lead com 3 produtos de 3 categorias diferentes conta em cada uma)
-  const closeRateByCategory = useMemo(() => {
-    const map = new Map<string, { total: number; fechados: number }>()
-    for (const l of leads) {
-      const seen = new Set<string>()
-      for (const it of l.items) {
-        if (seen.has(it.category)) continue  // não conta categoria duplicada no mesmo lead
-        seen.add(it.category)
-        const cur = map.get(it.category) ?? { total: 0, fechados: 0 }
-        cur.total += 1
-        if (l.stage === 'fechado') cur.fechados += 1
-        map.set(it.category, cur)
-      }
-    }
-    return Array.from(map.entries())
-      .map(([categoria, { total, fechados }]) => ({ categoria, taxa: total > 0 ? Math.round((fechados / total) * 100) : 0 }))
-      .sort((a, b) => b.taxa - a.taxa)
-  }, [leads])
-
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 16 }}>
-      {/* KPIs em linha */}
       <div className="glass glass-hover" style={{ padding: '20px 22px' }}>
         <div className="font-display" style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Pipeline aberto</div>
         <div className="font-display tabular" style={{ fontSize: 28, fontWeight: 700, color: 'var(--gold)', letterSpacing: '-0.02em', lineHeight: 1.1 }}>{fmtBRL(totalPipeline)}</div>
@@ -642,57 +609,6 @@ function MiniDashboard({ leads }: { leads: Lead[] }) {
         <div className="font-display tabular" style={{ fontSize: 28, fontWeight: 700, color: 'var(--trust-blue)', letterSpacing: '-0.02em', lineHeight: 1.1 }}>{fmtNum(leads.length)}</div>
         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, fontWeight: 500 }}>{leads.filter(l => l.recurring).length} recorrentes</div>
       </div>
-
-      {/* Bar chart de origens */}
-      {leadsBySource.length > 0 && (
-        <div className="glass" style={{ padding: 20, gridColumn: '1 / -1' }}>
-          <div style={{ fontFamily: "'Manrope','Rubik',sans-serif", fontWeight: 700, fontSize: 12, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>
-            Leads por Fonte
-          </div>
-          <ResponsiveContainer width="100%" height={210}>
-            <BarChart data={leadsBySource} layout="vertical" margin={{ top: 8, right: 12, left: 12, bottom: 0 }}>
-              <defs>
-                <linearGradient id="barBlue" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor="#2e5fcd" stopOpacity={0.85}/>
-                  <stop offset="100%" stopColor="#4d8af5" stopOpacity={0.95}/>
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="2 4" stroke="var(--border)" horizontal={false} />
-              <XAxis type="number" tick={{ fill: 'var(--text-muted)', fontSize: 11, fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} />
-              <YAxis type="category" dataKey="source" tick={{ fill: 'var(--text-muted)', fontSize: 11, fontFamily: 'Manrope', fontWeight: 500 }} axisLine={false} tickLine={false} width={110} />
-              <Tooltip
-                cursor={{ fill: 'rgba(77,138,245,0.08)' }}
-                contentStyle={{ background: 'var(--surface2)', border: '1px solid var(--gold)', borderRadius: 10, fontSize: 12, boxShadow: 'var(--shadow-lg)' }}
-              />
-              <Bar dataKey="leads" fill="url(#barBlue)" radius={[0, 8, 8, 0]} maxBarSize={28} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-
-      {/* Close rate por categoria */}
-      {closeRateByCategory.length > 0 && (
-        <div className="glass" style={{ padding: 20, gridColumn: '1 / -1' }}>
-          <div style={{ fontFamily: "'Manrope','Rubik',sans-serif", fontWeight: 700, fontSize: 12, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>
-            Taxa de Fechamento por Categoria
-          </div>
-          <ResponsiveContainer width="100%" height={210}>
-            <BarChart data={closeRateByCategory} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="barGreen" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#5fb85a" stopOpacity={0.95}/>
-                  <stop offset="100%" stopColor="#3f8a3a" stopOpacity={0.85}/>
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="2 4" stroke="var(--border)" vertical={false} />
-              <XAxis dataKey="categoria" tick={{ fill: 'var(--text-muted)', fontSize: 11, fontFamily: 'Manrope' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 11, fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} width={42} unit="%" />
-              <Tooltip cursor={{ fill: 'rgba(95,184,90,0.08)' }} contentStyle={{ background: 'var(--surface2)', border: '1px solid var(--gold)', borderRadius: 10, fontSize: 12, boxShadow: 'var(--shadow-lg)' }} formatter={(v) => `${v}%`} />
-              <Bar dataKey="taxa" fill="url(#barGreen)" radius={[8, 8, 0, 0]} maxBarSize={56} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
     </div>
   )
 }

@@ -23,7 +23,7 @@ interface AuthContextValue {
   loading: boolean
   session: Session | null
   user: User | null
-  usuario: UsuarioRow | null         // linha em public.usuarios
+  usuario: UsuarioRow | null | undefined   // undefined = ainda buscando, null = não existe, row = ok
   isAuthenticated: boolean
   isActive: boolean                  // status === 'ativo'
   perfil: UserPerfil | null
@@ -56,7 +56,8 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [session, setSession] = useState<Session | null>(null)
-  const [usuario, setUsuario] = useState<UsuarioRow | null>(null)
+  // undefined = ainda não buscou; null = buscou e não achou; row = encontrado
+  const [usuario, setUsuario] = useState<UsuarioRow | null | undefined>(undefined)
 
   const fetchUsuario = useCallback(async (uid: string) => {
     if (!supabase) return null
@@ -84,49 +85,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!sb) { setLoading(false); return }
     let mounted = true
 
-    // Safety net: se algo travar, força loading=false após 8s pra não deixar
-    // o usuário preso na tela "Carregando..."
-    const failsafe = setTimeout(() => {
-      if (mounted) {
-        console.warn('[AuthContext] init timeout — forçando loading=false')
-        setLoading(false)
-      }
-    }, 8000)
-
-    const init = async () => {
+    // Limpa sessão local expirada (regras do "permanecer conectado")
+    if (isLocalSessionExpired()) {
+      sb.auth.signOut().catch(() => {})
       try {
-        // Se a sessão local expirou pelas regras do "permanecer conectado", força logout
-        if (isLocalSessionExpired()) {
-          await sb.auth.signOut()
-          try {
-            localStorage.removeItem(KEEP_KEY)
-            localStorage.removeItem(STARTED_KEY)
-          } catch {}
-        }
+        localStorage.removeItem(KEEP_KEY)
+        localStorage.removeItem(STARTED_KEY)
+      } catch {}
+    }
 
-        const { data } = await sb.auth.getSession()
+    // getSession com timeout de 2.5s — se travar, força null e libera UI
+    const timeoutPromise = new Promise<{ data: { session: Session | null } }>((resolve) => {
+      setTimeout(() => resolve({ data: { session: null } }), 2500)
+    })
+
+    Promise.race([sb.auth.getSession(), timeoutPromise])
+      .then(({ data }) => {
         if (!mounted) return
         setSession(data.session)
         if (data.session?.user) {
-          const u = await fetchUsuario(data.session.user.id)
-          if (mounted) setUsuario(u)
+          // Fetch usuario em background sem bloquear UI
+          fetchUsuario(data.session.user.id)
+            .then(u => { if (mounted) setUsuario(u) })
+            .catch(e => {
+              console.warn('[AuthContext] fetchUsuario error:', e)
+              if (mounted) setUsuario(null)
+            })
+        } else {
+          setUsuario(null)
         }
-      } catch (e) {
-        console.warn('[AuthContext] erro durante init:', e)
-      } finally {
-        if (mounted) {
-          clearTimeout(failsafe)
-          setLoading(false)
-        }
-      }
-    }
-    init()
+      })
+      .catch(e => {
+        console.warn('[AuthContext] getSession error:', e)
+        if (mounted) setUsuario(null)
+      })
+      .finally(() => {
+        if (mounted) setLoading(false)
+      })
 
-    const { data: sub } = sb.auth.onAuthStateChange(async (_event, newSession) => {
+    const { data: sub } = sb.auth.onAuthStateChange((_event, newSession) => {
+      if (!mounted) return
       setSession(newSession)
       if (newSession?.user) {
-        const u = await fetchUsuario(newSession.user.id)
-        setUsuario(u)
+        setUsuario(undefined)
+        fetchUsuario(newSession.user.id)
+          .then(u => { if (mounted) setUsuario(u) })
+          .catch(() => { if (mounted) setUsuario(null) })
       } else {
         setUsuario(null)
       }
@@ -134,7 +138,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       mounted = false
-      clearTimeout(failsafe)
       sub.subscription.unsubscribe()
     }
   }, [fetchUsuario])

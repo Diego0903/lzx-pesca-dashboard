@@ -135,6 +135,33 @@ export default function PedidosPage() {
   const ordersByState    = useMemo(() => buildOrdersByState(pedidos),    [pedidos])
   const salesByCategory  = useMemo(() => buildSalesByCategory(pedidos),  [pedidos])
 
+  // Charts derivados de TODO o pipeline (não só fechados) — vieram do CRM mini-dashboard
+  const leadsBySource = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const l of leads) map.set(l.origin, (map.get(l.origin) ?? 0) + 1)
+    return Array.from(map.entries())
+      .map(([source, leadsCount]) => ({ source, leads: leadsCount }))
+      .sort((a, b) => b.leads - a.leads)
+  }, [leads])
+
+  const closeRateByCategory = useMemo(() => {
+    const map = new Map<string, { total: number; fechados: number }>()
+    for (const l of leads) {
+      const seen = new Set<string>()
+      for (const it of l.items) {
+        if (seen.has(it.category)) continue  // não conta categoria duplicada no mesmo lead
+        seen.add(it.category)
+        const cur = map.get(it.category) ?? { total: 0, fechados: 0 }
+        cur.total += 1
+        if (l.stage === 'fechado') cur.fechados += 1
+        map.set(it.category, cur)
+      }
+    }
+    return Array.from(map.entries())
+      .map(([categoria, { total, fechados }]) => ({ categoria, taxa: total > 0 ? Math.round((fechados / total) * 100) : 0 }))
+      .sort((a, b) => b.taxa - a.taxa)
+  }, [leads])
+
   if (loading) return (
     <div className="fade-in" style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)' }}>
       <div style={{ fontSize: 32, marginBottom: 12 }}>⏳</div>
@@ -240,6 +267,56 @@ export default function PedidosPage() {
         </ResponsiveContainer>
       </div>
       </>}
+
+      {/* Charts derivados de TODO o pipeline (vieram do CRM mini-dashboard) */}
+      {leadsBySource.length > 0 && (
+        <div className="glass" style={{ padding: 20, marginBottom: 16 }}>
+          <div className="font-display" style={{ fontWeight: 700, fontSize: 12, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>
+            Leads por Fonte
+          </div>
+          <ResponsiveContainer width="100%" height={210}>
+            <BarChart data={leadsBySource} layout="vertical" margin={{ top: 8, right: 12, left: 12, bottom: 0 }}>
+              <defs>
+                <linearGradient id="barBlue" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="#2e5fcd" stopOpacity={0.85}/>
+                  <stop offset="100%" stopColor="#4d8af5" stopOpacity={0.95}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="2 4" stroke="var(--border)" horizontal={false} />
+              <XAxis type="number" tick={{ fill: 'var(--text-muted)', fontSize: 11, fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} />
+              <YAxis type="category" dataKey="source" tick={{ fill: 'var(--text-muted)', fontSize: 11, fontFamily: 'Manrope', fontWeight: 500 }} axisLine={false} tickLine={false} width={110} />
+              <Tooltip
+                cursor={{ fill: 'rgba(77,138,245,0.08)' }}
+                contentStyle={{ background: 'var(--surface2)', border: '1px solid var(--gold)', borderRadius: 10, fontSize: 12, boxShadow: 'var(--shadow-lg)' }}
+              />
+              <Bar dataKey="leads" fill="url(#barBlue)" radius={[0, 8, 8, 0]} maxBarSize={28} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {closeRateByCategory.length > 0 && (
+        <div className="glass" style={{ padding: 20, marginBottom: 24 }}>
+          <div className="font-display" style={{ fontWeight: 700, fontSize: 12, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>
+            Taxa de Fechamento por Categoria
+          </div>
+          <ResponsiveContainer width="100%" height={210}>
+            <BarChart data={closeRateByCategory} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="barGreen" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#5fb85a" stopOpacity={0.95}/>
+                  <stop offset="100%" stopColor="#3f8a3a" stopOpacity={0.85}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="2 4" stroke="var(--border)" vertical={false} />
+              <XAxis dataKey="categoria" tick={{ fill: 'var(--text-muted)', fontSize: 11, fontFamily: 'Manrope' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 11, fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} width={42} unit="%" />
+              <Tooltip cursor={{ fill: 'rgba(95,184,90,0.08)' }} contentStyle={{ background: 'var(--surface2)', border: '1px solid var(--gold)', borderRadius: 10, fontSize: 12, boxShadow: 'var(--shadow-lg)' }} formatter={(v) => `${v}%`} />
+              <Bar dataKey="taxa" fill="url(#barGreen)" radius={[8, 8, 0, 0]} maxBarSize={56} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       {/* Tabela de vendas fechadas */}
       <div className="glass" style={{ padding: 0, overflow: 'hidden' }}>

@@ -12,6 +12,10 @@ import InstagramInsights from './components/InstagramInsights'
 import SectionNav, { MobileBottomNav, type Section } from './components/SectionNav'
 import CrmPage from './components/CrmPage'
 import PedidosPage from './components/PedidosPage'
+import AdminUsuariosPage from './pages/AdminUsuariosPage'
+import UserMenu from './components/UserMenu'
+import { useAuth } from './auth/AuthContext'
+import { useRoute } from './router/Router'
 import type { CampaignInsight, TimeSeriesPoint } from './types'
 
 interface TokenInfo {
@@ -54,7 +58,50 @@ export default function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     return (localStorage.getItem('lzx-theme') as 'dark' | 'light') || 'dark'
   })
-  const [section, setSection] = useState<Section>('marketing')
+  const { perfil } = useAuth()
+  const { pathname, navigate } = useRoute()
+  const isDono = perfil === 'dono'
+  // Sincroniza section com pathname (suporte a /admin/usuarios via URL)
+  const [section, setSection] = useState<Section>(() => {
+    if (pathname === '/admin/usuarios') return 'usuarios'
+    if (pathname.startsWith('/crm')) return 'crm'
+    if (pathname.startsWith('/pedidos')) return 'pedidos'
+    return 'marketing'
+  })
+
+  useEffect(() => {
+    // Atualiza URL ao trocar de seção (sem dar reload)
+    const target =
+      section === 'usuarios' ? '/admin/usuarios' :
+      section === 'crm'      ? '/crm' :
+      section === 'pedidos'  ? '/pedidos' :
+                               '/'
+    if (target !== pathname) navigate(target, { replace: true })
+  }, [section, pathname, navigate])
+
+  // Bloqueia acesso à aba usuarios se não for dono
+  useEffect(() => {
+    if (section === 'usuarios' && !isDono) setSection('marketing')
+  }, [section, isDono])
+
+  // Conta solicitações pendentes (apenas dono — RLS bloqueia outros)
+  const [pendentesCount, setPendentesCount] = useState(0)
+  useEffect(() => {
+    if (!isDono) { setPendentesCount(0); return }
+    let active = true
+    const fetchCount = async () => {
+      const { supabase } = await import('./lib/supabase')
+      if (!supabase) return
+      const { count } = await supabase
+        .from('usuarios')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pendente')
+      if (active) setPendentesCount(count ?? 0)
+    }
+    fetchCount()
+    const interval = setInterval(fetchCount, 30000)  // refresh a cada 30s
+    return () => { active = false; clearInterval(interval) }
+  }, [isDono, section])
 
   // Aplica tema
   useEffect(() => {
@@ -202,9 +249,10 @@ export default function App() {
           >
             {theme === 'dark' ? '☀️' : '🌙'}
           </button>
-          {hasAdsAccess && (
+          {hasAdsAccess && section === 'marketing' && (
             <DateFilter value={dateRange} onChange={setDateRange} />
           )}
+          <UserMenu />
           {selectedAccount && hasAdsAccess && (
             <div style={{ position: 'relative' }}>
               {showReportMenu && (
@@ -257,13 +305,14 @@ export default function App() {
       </header>
 
       <main className="main-content">
-        {/* Top section nav: Marketing | CRM | Pedidos */}
+        {/* Top section nav: Marketing | CRM | Pedidos | (Usuários) */}
         <div style={{ marginBottom: 20, display: 'flex', justifyContent: 'flex-start' }}>
-          <SectionNav active={section} onChange={setSection} />
+          <SectionNav active={section} onChange={setSection} showUsuarios={isDono} pendentesCount={pendentesCount} />
         </div>
 
         {section === 'crm' && <CrmPage />}
         {section === 'pedidos' && <PedidosPage />}
+        {section === 'usuarios' && isDono && <AdminUsuariosPage />}
 
         {section === 'marketing' && <>
         {/* Aviso de permissões */}
@@ -395,7 +444,7 @@ export default function App() {
       )}
 
       {/* Bottom nav fixo — só aparece em mobile */}
-      <MobileBottomNav active={section} onChange={setSection} />
+      <MobileBottomNav active={section} onChange={setSection} showUsuarios={isDono} pendentesCount={pendentesCount} />
     </div>
   )
 }

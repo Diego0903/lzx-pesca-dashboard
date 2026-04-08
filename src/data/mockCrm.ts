@@ -35,6 +35,10 @@ export interface Lead {
   lastContactAt: string  // ISO
   nextFollowUpAt?: string
   recurring: boolean
+  // ── Auditoria ──
+  createdBy?: string       // uuid de usuarios.id
+  createdByName?: string   // nome resolvido via embed (denormalized)
+  createdAt?: string       // ISO — vem de leads.created_at
 }
 
 export interface Interaction {

@@ -22,6 +22,9 @@ interface LeadRow {
   next_follow_up_at: string | null
   recurring: boolean | null
   notes: string | null
+  created_by: string | null
+  created_at: string | null
+  creator?: { nome: string } | null
 }
 
 interface InteractionRow {
@@ -89,6 +92,9 @@ const mapLead = (r: LeadRow): Lead => {
     lastContactAt: r.last_contact_at ?? new Date().toISOString(),
     nextFollowUpAt: r.next_follow_up_at ?? undefined,
     recurring: Boolean(r.recurring),
+    createdBy: r.created_by ?? undefined,
+    createdByName: r.creator?.nome ?? undefined,
+    createdAt: r.created_at ?? undefined,
   }
 }
 
@@ -146,7 +152,8 @@ export function useCrm(): UseCrmResult {
     }
     try {
       const [leadsRes, intRes, ordRes] = await Promise.all([
-        supabase.from('leads').select('*').order('last_contact_at', { ascending: false }),
+        // Embed do criador via FK created_by → usuarios.id (para mostrar "cadastrado por X")
+        supabase.from('leads').select('*, creator:usuarios!leads_created_by_fkey(nome)').order('last_contact_at', { ascending: false }),
         supabase.from('interactions').select('*').order('occurred_at', { ascending: false }),
         supabase.from('orders').select('*').order('ordered_at', { ascending: false }),
       ])
@@ -178,6 +185,10 @@ export function useCrm(): UseCrmResult {
       return
     }
     const totalGeral = lead.orderTotal + lead.shippingValue
+    // Pega o user atual pra preencher created_by automaticamente
+    const { data: userData } = await supabase.auth.getUser()
+    const currentUserId = userData?.user?.id ?? null
+
     const { data, error: err } = await supabase.from('leads').insert({
       name: lead.name,
       whatsapp: lead.whatsapp,
@@ -197,7 +208,8 @@ export function useCrm(): UseCrmResult {
       last_contact_at: lead.lastContactAt,
       next_follow_up_at: lead.nextFollowUpAt ?? null,
       recurring: lead.recurring,
-    }).select().single()
+      created_by: currentUserId,
+    }).select('*, creator:usuarios!leads_created_by_fkey(nome)').single()
     if (err) throw err
     if (data) setLeads(prev => [mapLead(data as LeadRow), ...prev])
   }, [])

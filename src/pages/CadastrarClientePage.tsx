@@ -72,6 +72,7 @@ export default function CadastrarClientePage() {
       last_contact_at: new Date().toISOString(),
       next_follow_up_at: new Date(Date.now() + 2 * 86400000).toISOString(),
       recurring: form.origin === 'Cliente Recorrente',
+      created_by: usuario?.id ?? null,
     })
     setBusy(false)
 

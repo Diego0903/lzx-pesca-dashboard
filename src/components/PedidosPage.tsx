@@ -6,6 +6,7 @@ import {
 import type { OrderStatus, Order } from '../data/mockCrm'
 import { useCrm } from '../hooks/useCrm'
 import { fmtBRL, fmtNum } from '../utils/formatters'
+import { exportToCsv, todayStamp } from '../utils/csv'
 
 // ── Helpers de agregação a partir de orders reais ──────────────
 function buildMonthlyRevenue(orders: Order[]) {
@@ -249,6 +250,23 @@ export default function PedidosPage() {
                 {f.l}
               </button>
             ))}
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => exportToCsv(`pedidos_${todayStamp()}.csv`, filtered, [
+                { key: 'client',   label: 'Cliente' },
+                { key: 'product',  label: 'Produto' },
+                { key: 'category', label: 'Categoria' },
+                { key: 'state',    label: 'Estado' },
+                { key: 'value',    label: 'Valor (R$)' },
+                { key: 'status',   label: 'Status' },
+                { key: 'date',     label: 'Data' },
+              ])}
+              disabled={filtered.length === 0}
+              title="Exportar CSV"
+            >
+              ⬇ CSV
+            </button>
           </div>
         </div>
         <div style={{ overflowX: 'auto' }}>

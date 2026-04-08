@@ -13,6 +13,7 @@ import SectionNav, { MobileBottomNav, type Section } from './components/SectionN
 import CrmPage from './components/CrmPage'
 import PedidosPage from './components/PedidosPage'
 import AdminUsuariosPage from './pages/AdminUsuariosPage'
+import ConfiguracoesPage from './pages/ConfiguracoesPage'
 import UserMenu from './components/UserMenu'
 import { useAuth } from './auth/AuthContext'
 import { useRoute } from './router/Router'
@@ -61,9 +62,10 @@ export default function App() {
   const { perfil } = useAuth()
   const { pathname, navigate } = useRoute()
   const isDono = perfil === 'dono'
-  // Sincroniza section com pathname (suporte a /admin/usuarios via URL)
+  // Sincroniza section com pathname
   const [section, setSection] = useState<Section>(() => {
     if (pathname === '/admin/usuarios') return 'usuarios'
+    if (pathname === '/configuracoes') return 'configuracoes'
     if (pathname.startsWith('/crm')) return 'crm'
     if (pathname.startsWith('/pedidos')) return 'pedidos'
     return 'marketing'
@@ -72,16 +74,17 @@ export default function App() {
   useEffect(() => {
     // Atualiza URL ao trocar de seção (sem dar reload)
     const target =
-      section === 'usuarios' ? '/admin/usuarios' :
-      section === 'crm'      ? '/crm' :
-      section === 'pedidos'  ? '/pedidos' :
-                               '/'
+      section === 'usuarios'      ? '/admin/usuarios' :
+      section === 'configuracoes' ? '/configuracoes' :
+      section === 'crm'           ? '/crm' :
+      section === 'pedidos'       ? '/pedidos' :
+                                    '/'
     if (target !== pathname) navigate(target, { replace: true })
   }, [section, pathname, navigate])
 
-  // Bloqueia acesso à aba usuarios se não for dono
+  // Bloqueia acesso a abas só de Dono
   useEffect(() => {
-    if (section === 'usuarios' && !isDono) setSection('marketing')
+    if ((section === 'usuarios' || section === 'configuracoes') && !isDono) setSection('marketing')
   }, [section, isDono])
 
   // Conta solicitações pendentes (apenas dono — RLS bloqueia outros)
@@ -315,14 +318,15 @@ export default function App() {
       </header>
 
       <main className="main-content">
-        {/* Top section nav: Marketing | CRM | Pedidos | (Usuários) */}
+        {/* Top section nav: Marketing | CRM | Pedidos | (Usuários | Configurações) */}
         <div style={{ marginBottom: 20, display: 'flex', justifyContent: 'flex-start' }}>
-          <SectionNav active={section} onChange={setSection} showUsuarios={isDono} pendentesCount={pendentesCount} />
+          <SectionNav active={section} onChange={setSection} showDonoItems={isDono} pendentesCount={pendentesCount} />
         </div>
 
         {section === 'crm' && <CrmPage />}
         {section === 'pedidos' && <PedidosPage />}
         {section === 'usuarios' && isDono && <AdminUsuariosPage />}
+        {section === 'configuracoes' && isDono && <ConfiguracoesPage />}
 
         {section === 'marketing' && <>
         {/* Loading inicial — enquanto a checagem de token não resolveu */}
@@ -462,7 +466,7 @@ export default function App() {
       )}
 
       {/* Bottom nav fixo — só aparece em mobile */}
-      <MobileBottomNav active={section} onChange={setSection} showUsuarios={isDono} pendentesCount={pendentesCount} />
+      <MobileBottomNav active={section} onChange={setSection} showDonoItems={isDono} pendentesCount={pendentesCount} />
     </div>
   )
 }

@@ -7,6 +7,7 @@ export default function LoginPage() {
   const { navigate } = useRoute()
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
+  const [keepSignedIn, setKeepSignedIn] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -14,7 +15,7 @@ export default function LoginPage() {
     e.preventDefault()
     setError(null)
     setLoading(true)
-    const { error: err } = await signIn(email.trim(), senha)
+    const { error: err } = await signIn(email.trim(), senha, keepSignedIn)
     setLoading(false)
     if (err) {
       setError(err)
@@ -57,7 +58,7 @@ export default function LoginPage() {
               placeholder="seu@email.com"
             />
           </div>
-          <div className="field" style={{ marginBottom: 18 }}>
+          <div className="field" style={{ marginBottom: 14 }}>
             <label htmlFor="lp-senha">Senha</label>
             <input
               id="lp-senha"
@@ -69,6 +70,39 @@ export default function LoginPage() {
               placeholder="••••••••"
             />
           </div>
+
+          {/* Permanecer conectado */}
+          <label
+            htmlFor="lp-keep"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              marginBottom: 18,
+              cursor: 'pointer',
+              padding: '10px 12px',
+              borderRadius: 10,
+              background: keepSignedIn ? 'rgba(200,165,92,0.10)' : 'transparent',
+              border: `1px solid ${keepSignedIn ? 'var(--gold)' : 'var(--border)'}`,
+              transition: 'all 0.18s ease',
+            }}
+          >
+            <input
+              id="lp-keep"
+              type="checkbox"
+              checked={keepSignedIn}
+              onChange={e => setKeepSignedIn(e.target.checked)}
+              style={{ width: 16, height: 16, cursor: 'pointer', accentColor: 'var(--gold)' }}
+            />
+            <div style={{ flex: 1, lineHeight: 1.3 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>
+                Permanecer conectado
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                {keepSignedIn ? 'Sessão dura 7 dias' : 'Sessão dura 1 dia'}
+              </div>
+            </div>
+          </label>
 
           {error && (
             <div style={{

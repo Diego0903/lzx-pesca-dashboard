@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import type { UsuarioRow, UserPerfil } from '../auth/AuthContext'
+import { writeAuditLog } from './useAuditLog'
 
 export interface UseUsuariosResult {
   loading: boolean
@@ -18,7 +19,8 @@ export interface UseUsuariosResult {
   resetSenha: (email: string) => Promise<void>
 }
 
-export function useUsuarios(currentUserId: string | null | undefined): UseUsuariosResult {
+export function useUsuarios(currentUser: UsuarioRow | null): UseUsuariosResult {
+  const currentUserId = currentUser?.id ?? null
   const [usuarios, setUsuarios] = useState<UsuarioRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -38,8 +40,12 @@ export function useUsuarios(currentUserId: string | null | undefined): UseUsuari
 
   useEffect(() => { load() }, [load])
 
+  // Helper para achar uma linha localmente (pra pegar o nome do alvo no log)
+  const find = (id: string) => usuarios.find(u => u.id === id) ?? null
+
   const aprovar: UseUsuariosResult['aprovar'] = async (id, perfil) => {
     if (!supabase) return
+    const target = find(id)
     const { error: err } = await supabase
       .from('usuarios')
       .update({
@@ -50,53 +56,91 @@ export function useUsuarios(currentUserId: string | null | undefined): UseUsuari
       })
       .eq('id', id)
     if (err) throw err
+    await writeAuditLog(currentUser, {
+      acao: 'aprovar',
+      alvoId: id,
+      alvoNome: target?.nome ?? null,
+      detalhes: { perfil },
+    })
     await load()
   }
 
   const rejeitar: UseUsuariosResult['rejeitar'] = async (id) => {
     if (!supabase) return
+    const target = find(id)
     const { error: err } = await supabase
       .from('usuarios')
       .update({ status: 'rejeitado', rejeitado_em: new Date().toISOString() })
       .eq('id', id)
     if (err) throw err
+    await writeAuditLog(currentUser, {
+      acao: 'rejeitar',
+      alvoId: id,
+      alvoNome: target?.nome ?? null,
+    })
     await load()
   }
 
   const desativar: UseUsuariosResult['desativar'] = async (id) => {
     if (!supabase) return
+    const target = find(id)
     const { error: err } = await supabase
       .from('usuarios')
       .update({ status: 'inativo', desativado_em: new Date().toISOString() })
       .eq('id', id)
     if (err) throw err
+    await writeAuditLog(currentUser, {
+      acao: 'desativar',
+      alvoId: id,
+      alvoNome: target?.nome ?? null,
+    })
     await load()
   }
 
   const reativar: UseUsuariosResult['reativar'] = async (id) => {
     if (!supabase) return
+    const target = find(id)
     const { error: err } = await supabase
       .from('usuarios')
       .update({ status: 'pendente', desativado_em: null, rejeitado_em: null })
       .eq('id', id)
     if (err) throw err
+    await writeAuditLog(currentUser, {
+      acao: 'reativar',
+      alvoId: id,
+      alvoNome: target?.nome ?? null,
+    })
     await load()
   }
 
   const alterarPerfil: UseUsuariosResult['alterarPerfil'] = async (id, novoPerfil) => {
     if (!supabase) return
+    const target = find(id)
+    const perfilAnterior = target?.perfil ?? null
     const { error: err } = await supabase
       .from('usuarios')
       .update({ perfil: novoPerfil })
       .eq('id', id)
     if (err) throw err
+    await writeAuditLog(currentUser, {
+      acao: 'alterar_perfil',
+      alvoId: id,
+      alvoNome: target?.nome ?? null,
+      detalhes: { de: perfilAnterior, para: novoPerfil },
+    })
     await load()
   }
 
   const resetSenha: UseUsuariosResult['resetSenha'] = async (email) => {
     if (!supabase) return
+    const target = usuarios.find(u => u.email === email) ?? null
     const { error: err } = await supabase.auth.resetPasswordForEmail(email)
     if (err) throw err
+    await writeAuditLog(currentUser, {
+      acao: 'reset_senha',
+      alvoId: target?.id ?? null,
+      alvoNome: target?.nome ?? email,
+    })
   }
 
   return {

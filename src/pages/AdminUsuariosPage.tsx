@@ -1,8 +1,36 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useAuth, type UsuarioRow, type UserPerfil } from '../auth/AuthContext'
 import { useUsuarios } from '../hooks/useUsuarios'
+import { useAuditLogs } from '../hooks/useAuditLog'
+import { exportToCsv, todayStamp } from '../utils/csv'
 
-type Tab = 'pendentes' | 'ativos' | 'rejeitados'
+type Tab = 'pendentes' | 'ativos' | 'rejeitados' | 'logs'
+
+const ACAO_LABEL: Record<string, { label: string; cls: string }> = {
+  aprovar:        { label: 'Aprovou',          cls: 'badge-green' },
+  rejeitar:       { label: 'Rejeitou',         cls: 'badge-red' },
+  desativar:      { label: 'Desativou',        cls: 'badge-orange' },
+  reativar:       { label: 'Reativou',         cls: 'badge-blue' },
+  alterar_perfil: { label: 'Alterou perfil',   cls: 'badge-gold' },
+  reset_senha:    { label: 'Resetou senha',    cls: 'badge-muted' },
+}
+
+function fmtAcaoDescricao(acao: string, alvoNome: string | null, detalhes: Record<string, unknown> | null): string {
+  const alvo = alvoNome ?? 'usuário'
+  switch (acao) {
+    case 'aprovar': return `${alvo} como ${(detalhes?.perfil as string) ?? '?'}`
+    case 'rejeitar': return alvo
+    case 'desativar': return alvo
+    case 'reativar': return `${alvo} (volta para pendente)`
+    case 'alterar_perfil': return `${alvo}: ${(detalhes?.de as string) ?? '?'} → ${(detalhes?.para as string) ?? '?'}`
+    case 'reset_senha': return `${alvo}`
+    default: return alvo
+  }
+}
+
+function fmtDateTime(iso: string): string {
+  return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })
+}
 
 const PERFIL_LABEL: Record<UserPerfil, string> = {
   dono: 'Dono',
@@ -22,8 +50,8 @@ function fmtDate(iso: string | null) {
 }
 
 export default function AdminUsuariosPage() {
-  const { user } = useAuth()
-  const { loading, error, pendentes, ativos, rejeitados, aprovar, rejeitar, desativar, reativar, alterarPerfil, resetSenha } = useUsuarios(user?.id)
+  const { user, usuario } = useAuth()
+  const { loading, error, pendentes, ativos, rejeitados, aprovar, rejeitar, desativar, reativar, alterarPerfil, resetSenha } = useUsuarios(usuario)
   const [tab, setTab] = useState<Tab>('pendentes')
   const [approveModal, setApproveModal] = useState<UsuarioRow | null>(null)
   const [approvePerfil, setApprovePerfil] = useState<'admin' | 'funcionario'>('funcionario')
@@ -80,13 +108,36 @@ export default function AdminUsuariosPage() {
 
   return (
     <div className="fade-in">
-      <div style={{ marginBottom: 24 }}>
-        <div className="font-display" style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' }}>
-          Gerenciamento de Usuários
+      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <div className="font-display" style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' }}>
+            Gerenciamento de Usuários
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+            Aprovar, alterar perfis e gerenciar acessos da equipe
+          </div>
         </div>
-        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-          Aprovar, alterar perfis e gerenciar acessos da equipe
-        </div>
+        <button
+          type="button"
+          className="btn-secondary"
+          onClick={() => {
+            const all = [...pendentes, ...ativos, ...rejeitados]
+            exportToCsv(`usuarios_${todayStamp()}.csv`, all, [
+              { key: 'nome',            label: 'Nome' },
+              { key: 'email',           label: 'Email' },
+              { key: 'perfil',          label: 'Perfil' },
+              { key: 'status',          label: 'Status' },
+              { key: 'cargo_informado', label: 'Cargo informado' },
+              { key: 'criado_em',       label: 'Solicitado em',  format: u => fmtDate(u.criado_em) },
+              { key: 'aprovado_em',     label: 'Aprovado em',    format: u => fmtDate(u.aprovado_em) },
+              { key: 'rejeitado_em',    label: 'Rejeitado em',   format: u => fmtDate(u.rejeitado_em) },
+              { key: 'desativado_em',   label: 'Desativado em',  format: u => fmtDate(u.desativado_em) },
+            ])
+          }}
+          title="Exportar lista de usuários (sem senhas)"
+        >
+          ⬇ Exportar CSV
+        </button>
       </div>
 
       {error && (
@@ -96,11 +147,12 @@ export default function AdminUsuariosPage() {
       )}
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--border)' }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
         {([
           { k: 'pendentes' as const, l: 'Pendentes', count: pendentes.length },
           { k: 'ativos' as const,    l: 'Ativos',    count: ativos.length },
           { k: 'rejeitados' as const,l: 'Rejeitados',count: rejeitados.length },
+          { k: 'logs' as const,      l: 'Logs de Auditoria', count: 0 },
         ]).map(t => (
           <button
             key={t.k}
@@ -256,6 +308,9 @@ export default function AdminUsuariosPage() {
         </div>
       )}
 
+      {/* Logs de auditoria */}
+      {tab === 'logs' && <AuditLogsTab />}
+
       {/* Modal de aprovação */}
       {approveModal && (
         <div
@@ -307,6 +362,105 @@ export default function AdminUsuariosPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Aba "Logs de Auditoria" ────────────────────────────────────
+type AcaoFilter = 'all' | 'aprovar' | 'rejeitar' | 'desativar' | 'reativar' | 'alterar_perfil' | 'reset_senha'
+type PeriodoFilter = 'hoje' | '7d' | '30d' | 'all'
+
+function AuditLogsTab() {
+  const { logs, loading, error, reload } = useAuditLogs()
+  const [acaoFilter, setAcaoFilter] = useState<AcaoFilter>('all')
+  const [periodoFilter, setPeriodoFilter] = useState<PeriodoFilter>('30d')
+
+  const filtered = useMemo(() => {
+    const now = Date.now()
+    const limites: Record<PeriodoFilter, number> = {
+      hoje: 24 * 60 * 60 * 1000,
+      '7d': 7 * 24 * 60 * 60 * 1000,
+      '30d': 30 * 24 * 60 * 60 * 1000,
+      all: Infinity,
+    }
+    const limit = limites[periodoFilter]
+    return logs.filter(l => {
+      if (acaoFilter !== 'all' && l.acao !== acaoFilter) return false
+      const elapsed = now - new Date(l.criado_em).getTime()
+      if (elapsed > limit) return false
+      return true
+    })
+  }, [logs, acaoFilter, periodoFilter])
+
+  if (loading) return (
+    <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: 13 }}>
+      ⏳ Carregando logs...
+    </div>
+  )
+
+  return (
+    <div className="glass" style={{ padding: 0, overflow: 'hidden' }}>
+      <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--glass-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div className="font-display" style={{ fontWeight: 700, fontSize: 12, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+          Logs de Auditoria <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 12, textTransform: 'none', letterSpacing: 0 }}>({filtered.length})</span>
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <select value={periodoFilter} onChange={e => setPeriodoFilter(e.target.value as PeriodoFilter)} style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 10px', color: 'var(--text)', fontSize: 12 }}>
+            <option value="hoje">Hoje</option>
+            <option value="7d">Últimos 7 dias</option>
+            <option value="30d">Últimos 30 dias</option>
+            <option value="all">Todos</option>
+          </select>
+          <select value={acaoFilter} onChange={e => setAcaoFilter(e.target.value as AcaoFilter)} style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 10px', color: 'var(--text)', fontSize: 12 }}>
+            <option value="all">Todas as ações</option>
+            <option value="aprovar">Aprovações</option>
+            <option value="rejeitar">Rejeições</option>
+            <option value="desativar">Desativações</option>
+            <option value="reativar">Reativações</option>
+            <option value="alterar_perfil">Alterações de perfil</option>
+            <option value="reset_senha">Resets de senha</option>
+          </select>
+          <button type="button" className="btn-secondary" onClick={reload} title="Atualizar">↻</button>
+        </div>
+      </div>
+
+      {error && (
+        <div style={{ padding: 16, color: 'var(--trust-red)', fontSize: 12 }}>
+          {error}
+        </div>
+      )}
+
+      {filtered.length === 0 ? (
+        <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+          Nenhum log encontrado para os filtros aplicados.
+        </div>
+      ) : (
+        <div style={{ overflowX: 'auto' }}>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Data / hora</th>
+                <th>Ação</th>
+                <th>Quem fez</th>
+                <th>Detalhes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(l => {
+                const meta = ACAO_LABEL[l.acao] ?? { label: l.acao, cls: 'badge-muted' }
+                return (
+                  <tr key={l.id}>
+                    <td style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{fmtDateTime(l.criado_em)}</td>
+                    <td><span className={`badge ${meta.cls}`}>{meta.label}</span></td>
+                    <td style={{ fontWeight: 600 }}>{l.usuario_nome ?? '—'}</td>
+                    <td style={{ color: 'var(--text-muted)' }}>{fmtAcaoDescricao(l.acao, l.alvo_nome, l.detalhes)}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

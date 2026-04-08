@@ -7,6 +7,7 @@ import type {
 } from '../data/mockCrm'
 import { useCrm } from '../hooks/useCrm'
 import { fmtBRL, fmtNum } from '../utils/formatters'
+import { exportToCsv, todayStamp } from '../utils/csv'
 
 const STAGES: { key: LeadStage; label: string; color: string }[] = [
   { key: 'novo',        label: 'Novo Lead',        color: '#3b82f6' },
@@ -98,6 +99,11 @@ function Kanban({ leads, onMove, onSelect, selectedId }: KanbanProps) {
                       {overdue ? '⚠ vencido' : fmtDate(lead.lastContactAt)}
                     </span>
                   </div>
+                  {lead.createdByName && (
+                    <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 6, paddingTop: 6, borderTop: '1px solid var(--border-soft)' }}>
+                      por {lead.createdByName}
+                    </div>
+                  )}
                 </div>
               )
             })}
@@ -163,8 +169,34 @@ function ClientList({ leads, onSelect, onDelete }: ListProps) {
   return (
     <div className="glass" style={{ padding: 0, overflow: 'hidden' }}>
       <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--glass-border)' }}>
-        <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 700, fontSize: 13, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>
-          Clientes & Leads <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 12, textTransform: 'none' }}>({filtered.length})</span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ fontFamily: "'Manrope','Rubik',sans-serif", fontWeight: 700, fontSize: 12, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+            Clientes & Leads <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 12, textTransform: 'none', letterSpacing: 0 }}>({filtered.length})</span>
+          </div>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => exportToCsv(`leads_${todayStamp()}.csv`, filtered, [
+              { key: 'name',          label: 'Nome' },
+              { key: 'whatsapp',      label: 'WhatsApp' },
+              { key: 'city',          label: 'Cidade' },
+              { key: 'state',         label: 'Estado' },
+              { key: 'category',      label: 'Categoria principal', format: l => l.items[0]?.category ?? l.category },
+              { key: 'product',       label: 'Produtos', format: l => l.items.map(i => `${i.product} (${i.qty})`).join(' · ') || l.product },
+              { key: 'orderTotal',    label: 'Valor pedido (R$)' },
+              { key: 'shippingValue', label: 'Frete (R$)' },
+              { key: 'estimatedValue',label: 'Total geral (R$)' },
+              { key: 'origin',        label: 'Origem' },
+              { key: 'stage',         label: 'Estágio' },
+              { key: 'createdByName', label: 'Cadastrado por', format: l => l.createdByName ?? '' },
+              { key: 'createdAt',     label: 'Data do cadastro', format: l => l.createdAt ? new Date(l.createdAt).toLocaleDateString('pt-BR') : '' },
+              { key: 'lastContactAt', label: 'Último contato', format: l => new Date(l.lastContactAt).toLocaleDateString('pt-BR') },
+            ])}
+            disabled={filtered.length === 0}
+            title="Exportar CSV dos leads visíveis"
+          >
+            ⬇ CSV
+          </button>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <input
@@ -210,6 +242,12 @@ function ClientList({ leads, onSelect, onDelete }: ListProps) {
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {l.city}/{l.state} · {productSummary} · {fmtBRL(l.estimatedValue)}
                 </div>
+                {l.createdByName && (
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 3 }}>
+                    Cadastrado por <strong style={{ color: 'var(--text-muted)' }}>{l.createdByName}</strong>
+                    {l.createdAt && ` · ${new Date(l.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}`}
+                  </div>
+                )}
               </button>
               <button
                 type="button"

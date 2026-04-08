@@ -27,10 +27,28 @@ interface AuthContextValue {
   isAuthenticated: boolean
   isActive: boolean                  // status === 'ativo'
   perfil: UserPerfil | null
-  signIn: (email: string, password: string) => Promise<{ error?: string }>
+  signIn: (email: string, password: string, keepSignedIn?: boolean) => Promise<{ error?: string }>
   signUp: (params: { nome: string; email: string; password: string; cargoInformado: string }) => Promise<{ error?: string }>
   signOut: () => Promise<void>
   reloadUsuario: () => Promise<void>
+}
+
+// Chaves de localStorage usadas para "Permanecer conectado"
+const KEEP_KEY = 'lzx-session-keep'         // 'true' = 7 dias, 'false' = 24h
+const STARTED_KEY = 'lzx-session-started'   // ISO timestamp do último login
+const ONE_DAY_MS  = 24 * 60 * 60 * 1000
+const ONE_WEEK_MS = 7  * 24 * 60 * 60 * 1000
+
+/** Verifica se a sessão local expirou pelas regras do "permanecer conectado". */
+function isLocalSessionExpired(): boolean {
+  try {
+    const startedAt = localStorage.getItem(STARTED_KEY)
+    if (!startedAt) return false  // Sem timestamp = sessão antiga, não expira
+    const keep = localStorage.getItem(KEEP_KEY) === 'true'
+    const elapsed = Date.now() - new Date(startedAt).getTime()
+    const limit = keep ? ONE_WEEK_MS : ONE_DAY_MS
+    return elapsed > limit
+  } catch { return false }
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -66,6 +84,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!sb) { setLoading(false); return }
     let mounted = true
 
+    // Antes de qualquer coisa: se a sessão local expirou pelas regras do
+    // "permanecer conectado", força logout
+    if (isLocalSessionExpired()) {
+      sb.auth.signOut().finally(() => {
+        try {
+          localStorage.removeItem(KEEP_KEY)
+          localStorage.removeItem(STARTED_KEY)
+        } catch {}
+      })
+    }
+
     sb.auth.getSession().then(async ({ data }) => {
       if (!mounted) return
       setSession(data.session)
@@ -89,10 +118,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => { mounted = false; sub.subscription.unsubscribe() }
   }, [fetchUsuario])
 
-  const signIn: AuthContextValue['signIn'] = async (email, password) => {
+  const signIn: AuthContextValue['signIn'] = async (email, password, keepSignedIn = false) => {
     if (!supabase) return { error: 'Supabase não configurado' }
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) return { error: traduzErroSupabase(error.message) }
+    // Salva preferência de duração da sessão (1 semana se "permanecer conectado", 1 dia se não)
+    try {
+      localStorage.setItem(KEEP_KEY, keepSignedIn ? 'true' : 'false')
+      localStorage.setItem(STARTED_KEY, new Date().toISOString())
+    } catch {}
     return {}
   }
 
@@ -116,6 +150,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut()
     setSession(null)
     setUsuario(null)
+    try {
+      localStorage.removeItem(KEEP_KEY)
+      localStorage.removeItem(STARTED_KEY)
+    } catch {}
   }
 
   const value: AuthContextValue = useMemo(() => ({

@@ -3,11 +3,22 @@ import cors from 'cors'
 import { mkdirSync, writeFileSync, existsSync, readFileSync, readdirSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
+import { createClient } from '@supabase/supabase-js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
-const TOKEN = process.env.META_TOKEN
-if (!TOKEN) throw new Error('META_TOKEN não definido')
+const ENV_TOKEN = process.env.META_TOKEN
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+// Cliente admin do Supabase (opcional — só pra ler app_settings)
+const supabaseAdmin = (SUPABASE_URL && SUPABASE_SERVICE_KEY)
+  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } })
+  : null
+
+if (!ENV_TOKEN && !supabaseAdmin) {
+  throw new Error('Nenhum META_TOKEN configurado (nem env nem Supabase app_settings)')
+}
 
 const BASE_URL = 'https://graph.facebook.com/v21.0'
 const DATA_DIR = join(__dirname, '..', 'data')
@@ -15,11 +26,41 @@ const REPORTS_DIR = join(__dirname, '..', 'reports')
 
 try { mkdirSync(DATA_DIR, { recursive: true }); mkdirSync(REPORTS_DIR, { recursive: true }) } catch {}
 
+// ── Cache de token ────────────────────────────────────────────
+// Lê primeiro de app_settings (Supabase) e cai pra env como fallback.
+// Faz cache em memória por 60s pra não martelar o banco a cada request.
+let tokenCache = { value: ENV_TOKEN, expiresAt: 0 }
+async function getMetaToken() {
+  const now = Date.now()
+  if (tokenCache.value && now < tokenCache.expiresAt) return tokenCache.value
+  if (!supabaseAdmin) {
+    tokenCache = { value: ENV_TOKEN, expiresAt: now + 60_000 }
+    return ENV_TOKEN
+  }
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'meta_token')
+      .maybeSingle()
+    if (error) throw error
+    const fromDb = data?.value
+    const finalToken = fromDb || ENV_TOKEN
+    tokenCache = { value: finalToken, expiresAt: now + 60_000 }
+    return finalToken
+  } catch (e) {
+    console.warn('[getMetaToken] Falha ao ler app_settings, usando env:', e?.message)
+    tokenCache = { value: ENV_TOKEN, expiresAt: now + 60_000 }
+    return ENV_TOKEN
+  }
+}
+
 const app = express()
 app.use(cors())
 app.use(express.json())
 
 async function metaFetch(path, params = {}) {
+  const TOKEN = await getMetaToken()
   const parts = [`access_token=${encodeURIComponent(TOKEN)}`]
   for (const [k, v] of Object.entries(params)) {
     parts.push(`${k}=${encodeURIComponent(String(v))}`)
@@ -33,7 +74,10 @@ function saveJSON(filename, data) {
 }
 
 app.get('/api/token-status', async (req, res) => {
-  try { res.json(await metaFetch('debug_token', { input_token: TOKEN })) }
+  try {
+    const TOKEN = await getMetaToken()
+    res.json(await metaFetch('debug_token', { input_token: TOKEN }))
+  }
   catch (e) { res.status(500).json({ error: e.message }) }
 })
 

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAuth, type UserPerfil } from '../auth/AuthContext'
+import ChangePasswordModal from './ChangePasswordModal'
 
 const PERFIL_LABEL: Record<UserPerfil, string> = {
   dono: 'Dono',
@@ -19,6 +20,7 @@ function initials(nome: string) {
 export default function UserMenu() {
   const { usuario, signOut } = useAuth()
   const [open, setOpen] = useState(false)
+  const [showChangePassword, setShowChangePassword] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -105,6 +107,27 @@ export default function UserMenu() {
           </div>
           <button
             type="button"
+            onClick={() => { setOpen(false); setShowChangePassword(true) }}
+            style={{
+              width: '100%',
+              background: 'transparent',
+              border: '1px solid var(--border)',
+              borderRadius: 10,
+              padding: '9px 12px',
+              color: 'var(--text)',
+              cursor: 'pointer',
+              fontSize: 12,
+              fontWeight: 600,
+              marginBottom: 8,
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface2)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+          >
+            🔑 Trocar minha senha
+          </button>
+          <button
+            type="button"
             onClick={handleLogout}
             style={{
               width: '100%',
@@ -125,6 +148,8 @@ export default function UserMenu() {
           </button>
         </div>
       )}
+
+      {showChangePassword && <ChangePasswordModal onClose={() => setShowChangePassword(false)} />}
     </div>
   )
 }

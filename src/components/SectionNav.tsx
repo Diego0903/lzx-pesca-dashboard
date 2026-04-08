@@ -1,9 +1,9 @@
-export type Section = 'marketing' | 'crm' | 'pedidos' | 'usuarios'
+export type Section = 'marketing' | 'crm' | 'pedidos' | 'usuarios' | 'configuracoes'
 
 interface Props {
   active: Section
   onChange: (s: Section) => void
-  showUsuarios?: boolean      // mostra aba "Usuários" (só Dono)
+  showDonoItems?: boolean     // mostra abas "Usuários" e "Configurações" (só Dono)
   pendentesCount?: number     // badge no botão Usuários
 }
 
@@ -12,11 +12,14 @@ const BASE_ITEMS: { key: Section; label: string; icon: string }[] = [
   { key: 'crm',       label: 'CRM',       icon: '👥' },
   { key: 'pedidos',   label: 'Pedidos',   icon: '📦' },
 ]
-const USUARIOS_ITEM = { key: 'usuarios' as const, label: 'Usuários', icon: '🔑' }
+const DONO_ITEMS: { key: Section; label: string; icon: string }[] = [
+  { key: 'usuarios',     label: 'Usuários',      icon: '🔑' },
+  { key: 'configuracoes',label: 'Configurações', icon: '⚙️' },
+]
 
 /** Pílula horizontal — visível apenas em desktop */
-export default function SectionNav({ active, onChange, showUsuarios, pendentesCount = 0 }: Props) {
-  const items = showUsuarios ? [...BASE_ITEMS, USUARIOS_ITEM] : BASE_ITEMS
+export default function SectionNav({ active, onChange, showDonoItems, pendentesCount = 0 }: Props) {
+  const items = showDonoItems ? [...BASE_ITEMS, ...DONO_ITEMS] : BASE_ITEMS
   return (
     <nav className="section-nav-desktop" aria-label="Seções principais">
       {items.map(it => (
@@ -53,8 +56,8 @@ export default function SectionNav({ active, onChange, showUsuarios, pendentesCo
 }
 
 /** Bottom nav fixo — visível apenas em mobile */
-export function MobileBottomNav({ active, onChange, showUsuarios, pendentesCount = 0 }: Props) {
-  const items = showUsuarios ? [...BASE_ITEMS, USUARIOS_ITEM] : BASE_ITEMS
+export function MobileBottomNav({ active, onChange, showDonoItems, pendentesCount = 0 }: Props) {
+  const items = showDonoItems ? [...BASE_ITEMS, ...DONO_ITEMS] : BASE_ITEMS
   return (
     <nav className="bottom-nav" aria-label="Navegação móvel">
       {items.map(it => (

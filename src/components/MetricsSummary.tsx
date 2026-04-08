@@ -18,15 +18,15 @@ function Card({ label, value, sub, desc, color = 'var(--blue)', icon }: CardProp
   return (
     <div className="glass glass-hover" style={{
       padding: '20px 22px',
-      flex: '1 1 160px',
+      minHeight: 110,
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
         <span className="font-display" style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</span>
         <span style={{ fontSize: 18, opacity: 0.9 }}>{icon}</span>
       </div>
       <div className="font-display tabular" style={{ fontSize: 28, fontWeight: 700, color, letterSpacing: '-0.02em', lineHeight: 1.1 }}>{value}</div>
-      {sub && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, fontWeight: 500 }}>{sub}</div>}
-      {desc && <div style={{ fontSize: 10.5, color: 'var(--text-dim)', marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border-soft)', lineHeight: 1.5 }}>{desc}</div>}
+      {sub && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, fontWeight: 500 }}>{sub}</div>}
+      {desc && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border-soft)', lineHeight: 1.5 }}>{desc}</div>}
     </div>
   )
 }
@@ -58,10 +58,10 @@ export default function MetricsSummary({ insights }: Props) {
 
   return (
     <div>
-      <div className="font-display" style={{ fontWeight: 700, marginBottom: 14, fontSize: 12, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+      <div className="font-display" style={{ fontWeight: 700, marginBottom: 14, fontSize: 13, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
         Métricas Consolidadas
       </div>
-      <div className="stagger" style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+      <div className="stagger kpi-strip kpi-strip-4" style={{ gap: 12 }}>
         <Card label="Total Investido" value={fmtBRL(totals.spend)} sub={`${totals.activeCount} campanhas ativas`} color="var(--blue)" icon="💰" />
         <Card label="Impressões" value={fmtNum(totals.impressions)} color="var(--purple)" icon="👁️" />
         <Card label="Cliques" value={fmtNum(totals.clicks)} color="var(--cyan)" icon="🖱️" />

@@ -2,7 +2,7 @@ import { useMemo, useState, type FormEvent } from 'react'
 import type {
   Lead, LeadItem, LeadStage, LeadOrigin, ContactType, Interaction, ProductCategory, BrazilState,
 } from '../data/mockCrm'
-import { useCrm } from '../hooks/useCrm'
+import { useCrmContext } from '../contexts/CrmContext'
 import { fmtBRL, fmtNum } from '../utils/formatters'
 import { exportToCsv, todayStamp } from '../utils/csv'
 import { STAGE_LIST, STAGE_META } from '../data/leadStages'
@@ -66,7 +66,12 @@ function Kanban({ leads, onMove, onSelect, selectedId }: KanbanProps) {
             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>
               {fmtBRL(total)}
             </div>
-            {list.map(lead => {
+            {list.length === 0 ? (
+              <div className="kanban-col-empty">
+                <span className="kanban-col-empty-icon" aria-hidden="true">∅</span>
+                <span>Sem leads neste estágio</span>
+              </div>
+            ) : list.map(lead => {
               const overdue = isOverdue(lead.nextFollowUpAt)
               return (
                 <div
@@ -163,7 +168,7 @@ function ClientList({ leads, onSelect, onDelete, onChangeStage }: ListProps) {
     <div className="glass" style={{ padding: 0, overflow: 'hidden' }}>
       <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--glass-border)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 8, flexWrap: 'wrap' }}>
-          <div style={{ fontFamily: "'Manrope','Rubik',sans-serif", fontWeight: 700, fontSize: 12, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+          <div style={{ fontFamily: "'Manrope','Rubik',sans-serif", fontWeight: 700, fontSize: 15, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
             Clientes & Leads <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 12, textTransform: 'none', letterSpacing: 0 }}>({filtered.length})</span>
           </div>
           <button
@@ -422,7 +427,7 @@ function NewLeadForm({ onCreate }: FormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="glass lead-form" style={{ padding: 20 }}>
-      <div style={{ fontFamily: "'Manrope','Rubik',sans-serif", fontWeight: 700, fontSize: 12, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>
+      <div style={{ fontFamily: "'Manrope','Rubik',sans-serif", fontWeight: 700, fontSize: 15, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 16 }}>
         + Novo Lead
       </div>
 
@@ -591,30 +596,30 @@ function MiniDashboard({ leads }: { leads: Lead[] }) {
   const totalPipeline = leads.filter(l => l.stage !== 'perdido' && l.stage !== 'fechado').reduce((s, l) => s + l.estimatedValue, 0)
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 16 }}>
-      <div className="glass glass-hover" style={{ padding: '20px 22px' }}>
+    <div className="kpi-strip kpi-strip-3" style={{ marginBottom: 16 }}>
+      <div className="glass glass-hover" style={{ padding: '20px 22px', minHeight: 110 }}>
         <div className="font-display" style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Pipeline aberto</div>
         <div className="font-display tabular" style={{ fontSize: 28, fontWeight: 700, color: 'var(--gold)', letterSpacing: '-0.02em', lineHeight: 1.1 }}>{fmtBRL(totalPipeline)}</div>
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, fontWeight: 500 }}>{leads.filter(l => l.stage !== 'perdido' && l.stage !== 'fechado').length} leads ativos</div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, fontWeight: 500 }}>{leads.filter(l => l.stage !== 'perdido' && l.stage !== 'fechado').length} leads ativos</div>
       </div>
-      <div className="glass glass-hover" style={{ padding: '20px 22px', borderColor: openOverdue.length > 0 ? 'rgba(216,86,86,0.4)' : undefined }}>
+      <div className="glass glass-hover" style={{ padding: '20px 22px', minHeight: 110, borderColor: openOverdue.length > 0 ? 'rgba(216,86,86,0.4)' : undefined }}>
         <div className="font-display" style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
           <span aria-hidden="true">⚠</span> Sem contato {'>'}3 dias
         </div>
         <div className="font-display tabular" style={{ fontSize: 28, fontWeight: 700, color: openOverdue.length > 0 ? 'var(--trust-red)' : 'var(--trust-green)', letterSpacing: '-0.02em', lineHeight: 1.1 }}>{fmtNum(openOverdue.length)}</div>
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, fontWeight: 500 }}>requer follow-up urgente</div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, fontWeight: 500 }}>requer follow-up urgente</div>
       </div>
-      <div className="glass glass-hover" style={{ padding: '20px 22px' }}>
+      <div className="glass glass-hover" style={{ padding: '20px 22px', minHeight: 110 }}>
         <div className="font-display" style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Total de leads</div>
         <div className="font-display tabular" style={{ fontSize: 28, fontWeight: 700, color: 'var(--trust-blue)', letterSpacing: '-0.02em', lineHeight: 1.1 }}>{fmtNum(leads.length)}</div>
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, fontWeight: 500 }}>{leads.filter(l => l.recurring).length} recorrentes</div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, fontWeight: 500 }}>{leads.filter(l => l.recurring).length} recorrentes</div>
       </div>
     </div>
   )
 }
 
 export default function CrmPage() {
-  const { leads, interactions, loading, error, source, reload, createLead, moveLeadStage, addInteraction, deleteLead } = useCrm()
+  const { leads, interactions, loading, error, source, createLead, moveLeadStage, addInteraction, deleteLead } = useCrmContext()
   const [selected, setSelected] = useState<Lead | null>(null)
 
   // Pick a default selected lead once data lands
@@ -632,7 +637,9 @@ export default function CrmPage() {
     void deleteLead(lead.id)
   }
 
-  if (loading) return (
+  // Spinner só na primeira carga (sem dados ainda). Reloads subsequentes
+  // rodam em background pra não fazer a tela "piscar".
+  if (loading && leads.length === 0) return (
     <div className="fade-in" style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)' }}>
       <div style={{ fontSize: 32, marginBottom: 12 }}>⏳</div>
       Carregando dados do CRM...
@@ -646,16 +653,6 @@ export default function CrmPage() {
         <span className={`badge ${source === 'supabase' ? 'badge-green' : 'badge-red'}`}>
           {source === 'supabase' ? '🟢 Supabase conectado' : '🔴 Sem conexão com o banco'}
         </span>
-        <button
-          type="button"
-          onClick={() => void reload()}
-          className="btn-secondary"
-          style={{ padding: '4px 10px', fontSize: 11 }}
-          title="Atualizar dados agora"
-          disabled={loading}
-        >
-          {loading ? '⏳' : '↻'} Atualizar
-        </button>
         {error && <span style={{ color: 'var(--trust-red)' }}>· {error}</span>}
       </div>
 
@@ -675,7 +672,7 @@ export default function CrmPage() {
       <MiniDashboard leads={leads} />
 
       <div style={{ marginBottom: 20 }}>
-        <div style={{ fontFamily: "'Manrope','Rubik',sans-serif", fontWeight: 700, fontSize: 12, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 14 }}>
+        <div style={{ fontFamily: "'Manrope','Rubik',sans-serif", fontWeight: 700, fontSize: 15, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 14 }}>
           Pipeline de Vendas
         </div>
         <Kanban leads={leads} onMove={(id, to) => void moveLeadStage(id, to)} onSelect={setSelected} selectedId={effectiveSelected?.id} />

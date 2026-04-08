@@ -101,6 +101,7 @@ export interface UseCrmResult {
   loading: boolean
   error: string | null
   source: 'supabase' | 'offline'
+  lastUpdatedAt: Date | null
   reload: () => Promise<void>
   createLead: (lead: Omit<Lead, 'id'>) => Promise<void>
   moveLeadStage: (leadId: string, stage: LeadStage) => Promise<void>
@@ -114,6 +115,7 @@ export function useCrm(): UseCrmResult {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [source, setSource] = useState<'supabase' | 'offline'>('offline')
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -163,6 +165,7 @@ export function useCrm(): UseCrmResult {
       setLeads(leadsWithCreator.map(mapLead))
       setInteractions((intRes.data ?? []).map(mapInteraction))
       setSource('supabase')
+      setLastUpdatedAt(new Date())
     } catch (e) {
       console.warn('[useCrm] Supabase fetch failed:', e)
       setLeads([]); setInteractions([])
@@ -181,10 +184,7 @@ export function useCrm(): UseCrmResult {
 
   useEffect(() => { load() }, [load])
 
-  // Sincronização entre clientes: Realtime (instantâneo) + Polling (a cada 20s
-  // como safety net). O polling SEMPRE roda independente do status do Realtime —
-  // garante consistência eventual mesmo se a publication Postgres não estiver
-  // habilitada (migration 007_enable_realtime.sql).
+  // Sincronização entre clientes via Supabase Realtime (debounce 250ms).
   useEffect(() => {
     if (!supabase) return
     const sb = supabase
@@ -201,30 +201,8 @@ export function useCrm(): UseCrmResult {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'interactions' }, debouncedReload)
       .subscribe()
 
-    // Polling garantido a cada 20s — pausa quando a tab está oculta pra economizar requests
-    let pollingInterval: ReturnType<typeof setInterval> | null = null
-    const startPolling = () => {
-      if (pollingInterval) return
-      pollingInterval = setInterval(() => loadRef.current(), 20000)
-    }
-    const stopPolling = () => {
-      if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null }
-    }
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        loadRef.current()  // refresh imediato ao voltar pra tab
-        startPolling()
-      } else {
-        stopPolling()
-      }
-    }
-    if (document.visibilityState === 'visible') startPolling()
-    document.addEventListener('visibilitychange', onVisibilityChange)
-
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer)
-      stopPolling()
-      document.removeEventListener('visibilitychange', onVisibilityChange)
       sb.removeChannel(channel)
     }
   }, [])
@@ -325,7 +303,7 @@ export function useCrm(): UseCrmResult {
   }, [])
 
   return {
-    leads, interactions, loading, error, source,
+    leads, interactions, loading, error, source, lastUpdatedAt,
     reload: load, createLead, moveLeadStage, addInteraction, deleteLead,
   }
 }

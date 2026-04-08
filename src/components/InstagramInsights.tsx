@@ -16,16 +16,17 @@ function MetricCard({ label, value, icon, color = 'var(--blue)', sub }: { label:
     <div style={{
       background: 'var(--surface)',
       border: '1px solid var(--border)',
-      borderRadius: 10,
-      padding: '18px 20px',
-      flex: '1 1 140px',
+      borderRadius: 12,
+      padding: '20px 22px',
+      minHeight: 110,
+      boxShadow: 'var(--shadow-sm)',
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-        <span style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 500 }}>{label}</span>
+        <span className="font-display" style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</span>
         <span style={{ fontSize: 20 }}>{icon}</span>
       </div>
-      <div style={{ fontSize: 26, fontWeight: 700, color, letterSpacing: '-0.5px' }}>{value}</div>
-      {sub && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{sub}</div>}
+      <div className="font-display tabular" style={{ fontSize: 26, fontWeight: 700, color, letterSpacing: '-0.02em', lineHeight: 1.1 }}>{value}</div>
+      {sub && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{sub}</div>}
     </div>
   )
 }
@@ -40,7 +41,7 @@ function MediaCard({ media }: { media: IgMedia }) {
   return (
     <a href={media.permalink} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
       <div
-        style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', cursor: 'pointer', transition: 'border-color 0.15s' }}
+        style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', cursor: 'pointer', transition: 'border-color 0.15s' }}
         onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--gold)')}
         onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
       >
@@ -146,7 +147,7 @@ export default function InstagramInsights({ dateRange, onIgUserId }: Props) {
     <div>
       {/* Profile header */}
       {profile && (
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '20px 24px', marginBottom: 24, display: 'flex', alignItems: 'center', gap: 20 }}>
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '20px 24px', marginBottom: 24, display: 'flex', alignItems: 'center', gap: 20, boxShadow: 'var(--shadow-sm)' }}>
           <img src={profile.profile_picture_url} alt={profile.username} style={{ width: 72, height: 72, borderRadius: '50%', border: '2px solid var(--gold)', objectFit: 'cover', flexShrink: 0 }} />
           <div style={{ minWidth: 0 }}>
             <div style={{ fontWeight: 700, fontSize: 18, color: 'var(--text)', marginBottom: 2 }}>@{profile.username}</div>
@@ -161,10 +162,10 @@ export default function InstagramInsights({ dateRange, onIgUserId }: Props) {
       )}
 
       {/* Metrics */}
-      <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 600, marginBottom: 12, fontSize: 14, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+      <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 700, marginBottom: 14, fontSize: 15, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
         Métricas do Período
       </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 32 }}>
+      <div className="kpi-strip kpi-strip-4" style={{ marginBottom: 32 }}>
         {profile && <MetricCard label="Seguidores" value={fmtNum(profile.followers_count)} icon="👥" color="var(--purple)" />}
         <MetricCard label="Novos Seguidores" value={fmtNum(sumMetric('follower_count'))} icon="➕" color="var(--green)" sub="no período selecionado" />
         <MetricCard label="Alcance" value={fmtNum(sumMetric('reach'))} icon="📡" color="var(--cyan)" />
@@ -179,7 +180,7 @@ export default function InstagramInsights({ dateRange, onIgUserId }: Props) {
       {/* Recent posts */}
       {media.length > 0 && (
         <>
-          <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 600, marginBottom: 12, fontSize: 14, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+          <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 700, marginBottom: 14, fontSize: 15, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
             Publicações Recentes
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>

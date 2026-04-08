@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
 import type { Lead } from '../data/mockCrm'
-import { useCrm } from '../hooks/useCrm'
+import { useCrmContext } from '../contexts/CrmContext'
 import { fmtBRL, fmtNum } from '../utils/formatters'
 import { exportToCsv, todayStamp } from '../utils/csv'
 
@@ -85,19 +85,43 @@ interface KpiProps {
 
 function KpiCard({ icon, label, value, sub, color = 'var(--gold)' }: KpiProps) {
   return (
-    <div className="glass glass-hover" style={{ padding: '20px 22px', flex: '1 1 190px', minWidth: 190 }}>
+    <div className="glass glass-hover" style={{ padding: '20px 22px', minHeight: 110 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
         <span className="font-display" style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</span>
         <span style={{ fontSize: 18, opacity: 0.9 }} aria-hidden="true">{icon}</span>
       </div>
       <div className="font-display tabular" style={{ fontSize: 28, fontWeight: 700, color, letterSpacing: '-0.02em', lineHeight: 1.1 }}>{value}</div>
-      {sub && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5, fontWeight: 500 }}>{sub}</div>}
+      {sub && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5, fontWeight: 500 }}>{sub}</div>}
     </div>
   )
 }
 
 interface TooltipEntry { name?: string; value?: number; color?: string }
 interface TooltipProps { active?: boolean; payload?: TooltipEntry[]; label?: string; fmt?: (v: number) => string }
+
+function InsightChip({ icon, label, value, color = 'var(--text)' }: { icon: string; label: string; value: string; color?: string }) {
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 6,
+      fontSize: 12,
+      background: 'rgba(200,165,92,0.06)',
+      border: '1px solid var(--glass-border)',
+      borderRadius: 999,
+      padding: '6px 12px',
+      whiteSpace: 'nowrap',
+    }}>
+      <span aria-hidden="true">{icon}</span>
+      <span style={{ color: 'var(--text-muted)' }}>{label}</span>
+      <strong style={{ color, fontWeight: 600 }}>{value}</strong>
+    </span>
+  )
+}
+
+const INSIGHT_ROW_STYLE: React.CSSProperties = {
+  display: 'flex', flexWrap: 'wrap', gap: 8,
+  marginTop: 14, paddingTop: 14,
+  borderTop: '1px solid var(--glass-border)',
+}
 
 function ChartTooltip({ active, payload, label, fmt }: TooltipProps) {
   if (!active || !payload?.length) return null
@@ -115,7 +139,7 @@ function ChartTooltip({ active, payload, label, fmt }: TooltipProps) {
 }
 
 export default function PedidosPage() {
-  const { leads, loading, source, reload } = useCrm()
+  const { leads, loading, source } = useCrmContext()
   const [page, setPage] = useState(0)
   const PAGE_SIZE = 8
 
@@ -134,6 +158,35 @@ export default function PedidosPage() {
   const monthlyRevenue   = useMemo(() => buildMonthlyRevenue(pedidos),   [pedidos])
   const ordersByState    = useMemo(() => buildOrdersByState(pedidos),    [pedidos])
   const salesByCategory  = useMemo(() => buildSalesByCategory(pedidos),  [pedidos])
+
+  // Insights derivados — alimentam chips de rodapé dos painéis
+  const monthlyInsights = useMemo(() => {
+    if (monthlyRevenue.length === 0) return null
+    const max = monthlyRevenue.reduce((m, d) => d.receita > m.receita ? d : m, monthlyRevenue[0])
+    const last = monthlyRevenue[monthlyRevenue.length - 1]
+    const prev = monthlyRevenue[monthlyRevenue.length - 2]
+    const mom = prev && prev.receita > 0 ? ((last.receita - prev.receita) / prev.receita) * 100 : null
+    const avg = monthlyRevenue.reduce((s, d) => s + d.receita, 0) / monthlyRevenue.length
+    return { max, mom, avg }
+  }, [monthlyRevenue])
+
+  // Top 3 categorias por unidades vendidas (pedidos fechados, somando qty dos items)
+  const topCategorias = useMemo(() => {
+    const map = new Map<string, number>()
+    let total = 0
+    for (const l of leads) {
+      if (l.stage !== 'fechado') continue
+      for (const it of l.items) {
+        map.set(it.category, (map.get(it.category) ?? 0) + it.qty)
+        total += it.qty
+      }
+    }
+    if (total === 0) return [] as { cat: string; qty: number; pct: number }[]
+    return Array.from(map.entries())
+      .map(([cat, qty]) => ({ cat, qty, pct: (qty / total) * 100 }))
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, 3)
+  }, [leads])
 
   // Charts derivados de TODO o pipeline (não só fechados) — vieram do CRM mini-dashboard
   const leadsBySource = useMemo(() => {
@@ -162,7 +215,8 @@ export default function PedidosPage() {
       .sort((a, b) => b.taxa - a.taxa)
   }, [leads])
 
-  if (loading) return (
+  // Spinner só na primeira carga (sem dados ainda). Reloads em background não trocam a tela.
+  if (loading && leads.length === 0) return (
     <div className="fade-in" style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)' }}>
       <div style={{ fontSize: 32, marginBottom: 12 }}>⏳</div>
       Carregando pedidos...
@@ -171,24 +225,14 @@ export default function PedidosPage() {
 
   return (
     <div className="fade-in">
-      <div style={{ marginBottom: 16, fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+      <div style={{ marginBottom: 16, fontSize: 11, color: 'var(--text-muted)' }}>
         <span className={`badge ${source === 'supabase' ? 'badge-green' : 'badge-red'}`}>
           {source === 'supabase' ? '🟢 Supabase conectado' : '🔴 Sem conexão com o banco'}
         </span>
-        <button
-          type="button"
-          onClick={() => void reload()}
-          className="btn-secondary"
-          style={{ padding: '4px 10px', fontSize: 11 }}
-          title="Atualizar dados agora"
-          disabled={loading}
-        >
-          {loading ? '⏳' : '↻'} Atualizar
-        </button>
       </div>
 
       {/* KPIs */}
-      <div className="stagger" style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 28 }}>
+      <div className="stagger kpi-strip kpi-strip-3" style={{ marginBottom: 28 }}>
         <KpiCard icon="💰" label="Receita total"   value={fmtBRL(totalRevenue)} sub="vendas fechadas" color="var(--gold)" />
         <KpiCard icon="✅" label="Vendas fechadas" value={fmtNum(pedidos.length)} sub={`${totalLeadsAtivos} leads ativos no pipeline`} color="var(--trust-green)" />
         <KpiCard icon="🧾" label="Ticket médio"   value={ticketMedio > 0 ? fmtBRL(ticketMedio) : '—'} sub={ticketMedio > 0 ? 'por venda' : 'sem vendas ainda'} color="var(--purple)" />
@@ -209,7 +253,7 @@ export default function PedidosPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 16, marginBottom: 16 }}>
         {/* Receita por mês */}
         <div className="glass" style={{ padding: 20 }}>
-          <div style={{ fontWeight: 700, fontSize: 12, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16, fontFamily: "'Manrope','Rubik',sans-serif" }}>
+          <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 16, fontFamily: "'Manrope','Rubik',sans-serif" }}>
             Receita Mensal · 6 meses
           </div>
           <ResponsiveContainer width="100%" height={250}>
@@ -235,11 +279,34 @@ export default function PedidosPage() {
               />
             </LineChart>
           </ResponsiveContainer>
+          {monthlyInsights && (
+            <div style={INSIGHT_ROW_STYLE}>
+              <InsightChip
+                icon="📈"
+                label="Mês mais forte"
+                value={`${monthlyInsights.max.month}: ${fmtBRL(monthlyInsights.max.receita)}`}
+                color="var(--gold)"
+              />
+              {monthlyInsights.mom !== null && (
+                <InsightChip
+                  icon={monthlyInsights.mom >= 0 ? '↗' : '↘'}
+                  label="Variação MoM"
+                  value={`${monthlyInsights.mom >= 0 ? '+' : ''}${monthlyInsights.mom.toFixed(1)}%`}
+                  color={monthlyInsights.mom >= 0 ? 'var(--trust-green)' : 'var(--trust-red)'}
+                />
+              )}
+              <InsightChip
+                icon="🎯"
+                label="Média mensal"
+                value={fmtBRL(monthlyInsights.avg)}
+              />
+            </div>
+          )}
         </div>
 
         {/* Distribuição por estado (donut) */}
         <div className="glass" style={{ padding: 20 }}>
-          <div style={{ fontWeight: 700, fontSize: 12, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16, fontFamily: "'Manrope','Rubik',sans-serif" }}>
+          <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 16, fontFamily: "'Manrope','Rubik',sans-serif" }}>
             Pedidos por Estado
           </div>
           <ResponsiveContainer width="100%" height={250}>
@@ -256,7 +323,7 @@ export default function PedidosPage() {
 
       {/* Charts row 2 — sales by category */}
       <div className="glass" style={{ padding: 20, marginBottom: 24 }}>
-        <div style={{ fontWeight: 700, fontSize: 12, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16, fontFamily: "'Manrope','Rubik',sans-serif" }}>
+        <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 16, fontFamily: "'Manrope','Rubik',sans-serif" }}>
           Produtos Vendidos por Categoria
         </div>
         <ResponsiveContainer width="100%" height={270}>
@@ -275,13 +342,30 @@ export default function PedidosPage() {
             <Bar dataKey="vendas" name="Unidades vendidas" fill="url(#barGold)" radius={[8, 8, 0, 0]} maxBarSize={56} />
           </BarChart>
         </ResponsiveContainer>
+        {topCategorias.length > 0 && (
+          <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--glass-border)' }}>
+            <div className="font-display" style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
+              Top 3 categorias por unidades
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {topCategorias.map((c, i) => (
+                <div key={c.cat} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--gold)', fontWeight: 700, width: 18 }}>{i + 1}</span>
+                  <span style={{ flex: 1, color: 'var(--text)', fontWeight: 500 }}>{c.cat}</span>
+                  <span className="tabular" style={{ color: 'var(--text-muted)' }}>{fmtNum(c.qty)} un</span>
+                  <span className="tabular" style={{ color: 'var(--gold)', fontWeight: 600, minWidth: 48, textAlign: 'right' }}>{c.pct.toFixed(1)}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
       </>}
 
       {/* Charts derivados de TODO o pipeline (vieram do CRM mini-dashboard) */}
       {leadsBySource.length > 0 && (
         <div className="glass" style={{ padding: 20, marginBottom: 16 }}>
-          <div className="font-display" style={{ fontWeight: 700, fontSize: 12, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>
+          <div className="font-display" style={{ fontWeight: 700, fontSize: 15, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 16 }}>
             Leads por Fonte
           </div>
           <ResponsiveContainer width="100%" height={210}>
@@ -307,7 +391,7 @@ export default function PedidosPage() {
 
       {closeRateByCategory.length > 0 && (
         <div className="glass" style={{ padding: 20, marginBottom: 24 }}>
-          <div className="font-display" style={{ fontWeight: 700, fontSize: 12, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>
+          <div className="font-display" style={{ fontWeight: 700, fontSize: 15, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 16 }}>
             Taxa de Fechamento por Categoria
           </div>
           <ResponsiveContainer width="100%" height={210}>
@@ -325,13 +409,29 @@ export default function PedidosPage() {
               <Bar dataKey="taxa" fill="url(#barGreen)" radius={[8, 8, 0, 0]} maxBarSize={56} />
             </BarChart>
           </ResponsiveContainer>
+          {closeRateByCategory.length >= 2 && (
+            <div style={INSIGHT_ROW_STYLE}>
+              <InsightChip
+                icon="🏆"
+                label="Melhor categoria"
+                value={`${closeRateByCategory[0].categoria} — ${closeRateByCategory[0].taxa}%`}
+                color="var(--trust-green)"
+              />
+              <InsightChip
+                icon="⚠"
+                label="A melhorar"
+                value={`${closeRateByCategory[closeRateByCategory.length - 1].categoria} — ${closeRateByCategory[closeRateByCategory.length - 1].taxa}%`}
+                color="var(--trust-red)"
+              />
+            </div>
+          )}
         </div>
       )}
 
       {/* Tabela de vendas fechadas */}
       <div className="glass" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', borderBottom: '1px solid var(--glass-border)', flexWrap: 'wrap', gap: 10 }}>
-          <div className="font-display" style={{ fontWeight: 700, fontSize: 12, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+          <div className="font-display" style={{ fontWeight: 700, fontSize: 15, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
             Vendas Fechadas <span className="tabular" style={{ color: 'var(--text-muted)', fontWeight: 500, fontSize: 12, textTransform: 'none', letterSpacing: 0, marginLeft: 4 }}>({pedidos.length})</span>
           </div>
           <button

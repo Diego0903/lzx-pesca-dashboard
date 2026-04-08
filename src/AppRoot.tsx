@@ -4,6 +4,7 @@ import { useRoute } from './router/Router'
 import LoginPage from './pages/LoginPage'
 import SolicitarAcessoPage from './pages/SolicitarAcessoPage'
 import CadastrarClientePage from './pages/CadastrarClientePage'
+import { CrmProvider } from './contexts/CrmContext'
 import App from './App'
 
 /**
@@ -88,10 +89,11 @@ export default function AppRoot() {
     return <FuncionarioRoute pathname={pathname} navigate={navigate} />
   }
 
-  // Admin/Dono → dashboard completo (componente App original)
-  // O App.tsx interno vai cuidar de marketing/crm/pedidos via SectionNav.
-  // /admin/usuarios é tratado dentro do App porque ele tem o header/layout.
-  return <App />
+  return (
+    <CrmProvider>
+      <App />
+    </CrmProvider>
+  )
 }
 
 function FuncionarioRoute({ pathname, navigate }: { pathname: string; navigate: (p: string, opts?: { replace?: boolean }) => void }) {

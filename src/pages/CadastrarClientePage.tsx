@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthContext'
 import { fmtBRL } from '../utils/formatters'
 import type { LeadItem, ProductCategory, BrazilState, LeadOrigin, LeadStage } from '../data/mockCrm'
 import StageBadgeSelect from '../components/StageBadgeSelect'
+import RefreshButton from '../components/RefreshButton'
 
 interface ItemRow {
   product: string
@@ -21,7 +22,7 @@ type Tab = 'cadastrar' | 'historico'
 export default function CadastrarClientePage() {
   const { usuario, signOut } = useAuth()
   const [tab, setTab] = useState<Tab>('cadastrar')
-  const [reloadHistory, setReloadHistory] = useState(0)
+  const meusLeads = useMeusLeads()
   const [form, setForm] = useState({
     nome: '', whatsapp: '', city: '', state: 'SC' as BrazilState, origin: 'Desconhecido' as LeadOrigin,
     items: [{ ...EMPTY_ITEM }] as ItemRow[],
@@ -90,7 +91,7 @@ export default function CadastrarClientePage() {
       nome: '', whatsapp: '', city: '', state: 'SC', origin: 'Desconhecido',
       items: [{ ...EMPTY_ITEM }], orderTotal: '', shippingValue: '',
     })
-    setReloadHistory(n => n + 1)  // dispara refresh do histórico
+    void meusLeads.load()
     setTimeout(() => setSuccess(false), 3500)
   }
 
@@ -112,9 +113,17 @@ export default function CadastrarClientePage() {
             </div>
           </div>
         </div>
-        <button type="button" className="btn-secondary" onClick={signOut}>
-          Sair
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <RefreshButton
+            lastUpdatedAt={meusLeads.lastUpdatedAt}
+            loading={meusLeads.loading}
+            onRefresh={() => void meusLeads.load()}
+            title="Atualizar histórico"
+          />
+          <button type="button" className="btn-secondary" onClick={signOut}>
+            Sair
+          </button>
+        </div>
       </div>
 
       {/* Tabs Cadastrar / Histórico */}
@@ -138,7 +147,7 @@ export default function CadastrarClientePage() {
       </div>
 
       {tab === 'historico' ? (
-        <MeusCadastrosHistory key={reloadHistory} />
+        <MeusCadastrosHistory meusLeads={meusLeads} />
       ) : (
       <div className="glass lead-form fade-in" style={{ padding: 24, maxWidth: 720, width: '100%', margin: '0 auto', flex: 1 }}>
         <div className="font-display" style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
@@ -265,9 +274,7 @@ export default function CadastrarClientePage() {
   )
 }
 
-// ── Histórico dos cadastros do funcionário ─────────────────────
-// A RLS de leads filtra automaticamente: o funcionário só recebe os
-// leads onde created_by = auth.uid().
+// RLS de leads filtra automaticamente: funcionário só vê created_by = auth.uid().
 interface LeadHistoryRow {
   id: string
   name: string
@@ -283,12 +290,12 @@ interface LeadHistoryRow {
   last_contact_at: string | null
 }
 
-function MeusCadastrosHistory() {
+export function useMeusLeads() {
   const [leads, setLeads] = useState<LeadHistoryRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [search, setSearch] = useState('')
   const [updatingId, setUpdatingId] = useState<string | null>(null)
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null)
 
   const load = useCallback(async () => {
     if (!supabase) { setLoading(false); return }
@@ -300,44 +307,35 @@ function MeusCadastrosHistory() {
       .order('created_at', { ascending: false })
       .limit(200)
     if (err) setError(err.message)
-    else setLeads((data ?? []) as LeadHistoryRow[])
+    else {
+      setLeads((data ?? []) as LeadHistoryRow[])
+      setLastUpdatedAt(new Date())
+    }
     setLoading(false)
   }, [])
 
   useEffect(() => { load() }, [load])
 
-  // Sincroniza com mudanças de admin/dono no kanban.
-  // Realtime (instantâneo) + polling 20s (safety net). Polling garante consistência
-  // mesmo sem a publication Postgres habilitada.
+  // loadRef + debounce: bursts de updates do Realtime ficam num único reload.
+  const loadRef = useRef(load)
+  useEffect(() => { loadRef.current = load }, [load])
   useEffect(() => {
     if (!supabase) return
     const sb = supabase
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null
+    const debouncedReload = () => {
+      if (debounceTimer) return
+      debounceTimer = setTimeout(() => { debounceTimer = null; loadRef.current() }, 250)
+    }
     const ch = sb
       .channel('funcionario-history')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, () => load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, debouncedReload)
       .subscribe()
-
-    let pollingInterval: ReturnType<typeof setInterval> | null = null
-    const startPolling = () => {
-      if (pollingInterval) return
-      pollingInterval = setInterval(() => load(), 20000)
-    }
-    const stopPolling = () => {
-      if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null }
-    }
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') { load(); startPolling() }
-      else stopPolling()
-    }
-    if (document.visibilityState === 'visible') startPolling()
-    document.addEventListener('visibilitychange', onVisibilityChange)
-
     return () => {
-      stopPolling()
-      document.removeEventListener('visibilitychange', onVisibilityChange)
+      if (debounceTimer) clearTimeout(debounceTimer)
       sb.removeChannel(ch)
     }
-  }, [load])
+  }, [])
 
   const updateStage = async (id: string, newStage: LeadStage) => {
     if (!supabase) return
@@ -354,6 +352,13 @@ function MeusCadastrosHistory() {
     }
     setUpdatingId(null)
   }
+
+  return { leads, loading, error, updatingId, lastUpdatedAt, load, updateStage }
+}
+
+function MeusCadastrosHistory({ meusLeads }: { meusLeads: ReturnType<typeof useMeusLeads> }) {
+  const { leads, loading, error, updatingId, updateStage } = meusLeads
+  const [search, setSearch] = useState('')
 
   const filtered = leads.filter(l => {
     if (!search) return true
@@ -380,16 +385,13 @@ function MeusCadastrosHistory() {
   return (
     <div className="glass fade-in" style={{ padding: 0, maxWidth: 720, width: '100%', margin: '0 auto', overflow: 'hidden' }}>
       <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--glass-border)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
-          <div>
-            <div className="font-display" style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>
-              Meus Cadastros
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-              Histórico dos clientes que você cadastrou
-            </div>
+        <div style={{ marginBottom: 12 }}>
+          <div className="font-display" style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>
+            Meus Cadastros
           </div>
-          <button type="button" className="btn-secondary" onClick={load} title="Atualizar">↻</button>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+            Histórico dos clientes que você cadastrou
+          </div>
         </div>
         <input
           type="search"
@@ -400,7 +402,7 @@ function MeusCadastrosHistory() {
         />
       </div>
 
-      {loading ? (
+      {loading && leads.length === 0 ? (
         <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
           ⏳ Carregando...
         </div>

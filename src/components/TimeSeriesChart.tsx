@@ -62,11 +62,12 @@ export default function TimeSeriesChart({ data }: Props) {
     <div style={{
       background: 'var(--surface)',
       border: '1px solid var(--border)',
-      borderRadius: 10,
+      borderRadius: 12,
       padding: '20px 20px 12px',
+      boxShadow: 'var(--shadow-sm)',
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 700, fontSize: 14, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Evolução Temporal <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 12 }}>({data.length} dias)</span></div>
+        <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 700, fontSize: 15, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Evolução Temporal <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 12 }}>({data.length} dias)</span></div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {METRICS.map(m => (
             <button

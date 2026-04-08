@@ -17,6 +17,8 @@ import ConfiguracoesPage from './pages/ConfiguracoesPage'
 import UserMenu from './components/UserMenu'
 import { useAuth } from './auth/AuthContext'
 import { useRoute } from './router/Router'
+import { useCrmContext } from './contexts/CrmContext'
+import RefreshButton from './components/RefreshButton'
 import type { CampaignInsight, TimeSeriesPoint } from './types'
 
 interface TokenInfo {
@@ -38,6 +40,7 @@ interface AdAccountRaw {
 const REQUIRED_SCOPES = ['ads_read', 'ads_management']
 
 export default function App() {
+  const { reload: reloadCrm, lastUpdatedAt: crmLastUpdatedAt, loading: crmLoading } = useCrmContext()
   const [tokenInfo, setTokenInfo] = useState<TokenInfo | null>(null)
   const [tokenError, setTokenError] = useState<string | null>(null)
   const [accounts, setAccounts] = useState<AdAccountRaw[]>([])
@@ -291,6 +294,7 @@ export default function App() {
           {hasAdsAccess && section === 'marketing' && (
             <DateFilter value={dateRange} onChange={setDateRange} />
           )}
+          <RefreshButton lastUpdatedAt={crmLastUpdatedAt} loading={crmLoading} onRefresh={() => void reloadCrm()} />
           <UserMenu />
           {selectedAccount && hasAdsAccess && (
             <div style={{ position: 'relative' }}>

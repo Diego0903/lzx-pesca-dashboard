@@ -63,14 +63,14 @@ export default function WhatsAppSection({ insights }: Props) {
           </svg>
         </span>
         <div>
-          <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 700, fontSize: 14, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>WhatsApp — Conversas Iniciadas</div>
+          <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 700, fontSize: 15, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>WhatsApp — Conversas Iniciadas</div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Principal canal de conversão da LZX Pesca</div>
         </div>
       </div>
 
       <div style={{ padding: 20 }}>
         {/* Cards de resumo */}
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 24 }}>
+        <div className="kpi-strip kpi-strip-4" style={{ marginBottom: 24 }}>
           {[
             {
               label: 'Total de Conversas',
@@ -96,22 +96,23 @@ export default function WhatsAppSection({ insights }: Props) {
             },
           ].map((card, i) => (
             <div key={i} style={{
-              flex: '1 1 140px',
               background: card.isWorst ? 'rgba(239,68,68,0.06)' : 'rgba(37,211,102,0.1)',
               border: `1px solid ${card.isWorst ? 'rgba(239,68,68,0.2)' : 'rgba(37,211,102,0.25)'}`,
-              borderRadius: 8,
-              padding: '14px 16px',
+              borderRadius: 12,
+              padding: '16px 18px',
+              minHeight: 110,
+              boxShadow: 'var(--shadow-sm)',
             }}>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>{card.label}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{card.label}</div>
               {card.value}
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{card.sub}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{card.sub}</div>
             </div>
           ))}
         </div>
 
         {/* Gráfico: mensagens por campanha */}
         <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: 'var(--text-muted)' }}>
+          <div style={{ fontFamily: "'Manrope','Rubik',sans-serif", fontSize: 15, fontWeight: 700, marginBottom: 12, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
             Mensagens Iniciadas por Campanha
           </div>
           <ResponsiveContainer width="100%" height={200}>
@@ -142,7 +143,7 @@ export default function WhatsAppSection({ insights }: Props) {
 
         {/* Tabela ranking */}
         <div>
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10, color: 'var(--text-muted)' }}>
+          <div style={{ fontFamily: "'Manrope','Rubik',sans-serif", fontSize: 15, fontWeight: 700, marginBottom: 12, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
             Ranking — Custo por Conversa WhatsApp
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -191,6 +192,24 @@ export default function WhatsAppSection({ insights }: Props) {
               )
             })}
           </div>
+          {campaigns.length < 5 && bestCampaign && (
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              marginTop: 12,
+              fontSize: 12,
+              background: 'rgba(37,211,102,0.08)',
+              border: '1px solid rgba(37,211,102,0.25)',
+              borderRadius: 999,
+              padding: '6px 12px',
+              maxWidth: '100%',
+            }}>
+              <span aria-hidden="true">💡</span>
+              <span style={{ color: 'var(--text-muted)' }}>Melhor campanha:</span>
+              <strong style={{ color: 'var(--text)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {bestCampaign.name} — {fmtBRL(bestCampaign.costPerMsg)}/conversa
+              </strong>
+            </div>
+          )}
         </div>
 
         {/* Dica */}

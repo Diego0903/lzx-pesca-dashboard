@@ -140,12 +140,12 @@ export default function CampaignTable({ insights }: Props) {
   )
 
   return (
-    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', boxShadow: 'var(--shadow-sm)' }}>
       <div style={{
         padding: '14px 20px', borderBottom: '1px solid var(--border)',
         display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12,
       }}>
-        <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 700, fontSize: 14, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 700, fontSize: 15, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           Campanhas <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 12, textTransform: 'none', letterSpacing: 0 }}>({insights.length})</span>
         </div>
         <input

@@ -614,7 +614,7 @@ function MiniDashboard({ leads }: { leads: Lead[] }) {
 }
 
 export default function CrmPage() {
-  const { leads, interactions, loading, error, source, createLead, moveLeadStage, addInteraction, deleteLead } = useCrm()
+  const { leads, interactions, loading, error, source, reload, createLead, moveLeadStage, addInteraction, deleteLead } = useCrm()
   const [selected, setSelected] = useState<Lead | null>(null)
 
   // Pick a default selected lead once data lands
@@ -642,10 +642,20 @@ export default function CrmPage() {
   return (
     <div className="fade-in">
       {/* Source banner */}
-      <div style={{ marginBottom: 16, fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ marginBottom: 16, fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <span className={`badge ${source === 'supabase' ? 'badge-green' : 'badge-red'}`}>
           {source === 'supabase' ? '🟢 Supabase conectado' : '🔴 Sem conexão com o banco'}
         </span>
+        <button
+          type="button"
+          onClick={() => void reload()}
+          className="btn-secondary"
+          style={{ padding: '4px 10px', fontSize: 11 }}
+          title="Atualizar dados agora"
+          disabled={loading}
+        >
+          {loading ? '⏳' : '↻'} Atualizar
+        </button>
         {error && <span style={{ color: 'var(--trust-red)' }}>· {error}</span>}
       </div>
 

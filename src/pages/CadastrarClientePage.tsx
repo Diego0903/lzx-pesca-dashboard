@@ -306,26 +306,35 @@ function MeusCadastrosHistory() {
 
   useEffect(() => { load() }, [load])
 
-  // Sincroniza a lista quando admin/dono move o stage no kanban.
-  // Realtime com fallback pra polling 30s caso a publication não esteja habilitada.
+  // Sincroniza com mudanças de admin/dono no kanban.
+  // Realtime (instantâneo) + polling 20s (safety net). Polling garante consistência
+  // mesmo sem a publication Postgres habilitada.
   useEffect(() => {
     if (!supabase) return
     const sb = supabase
-    let pollingInterval: ReturnType<typeof setInterval> | null = null
-    const startPollingFallback = () => {
-      if (pollingInterval) return
-      pollingInterval = setInterval(() => load(), 30000)
-    }
     const ch = sb
       .channel('funcionario-history')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, () => load())
-      .subscribe(status => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-          startPollingFallback()
-        }
-      })
+      .subscribe()
+
+    let pollingInterval: ReturnType<typeof setInterval> | null = null
+    const startPolling = () => {
+      if (pollingInterval) return
+      pollingInterval = setInterval(() => load(), 20000)
+    }
+    const stopPolling = () => {
+      if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null }
+    }
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') { load(); startPolling() }
+      else stopPolling()
+    }
+    if (document.visibilityState === 'visible') startPolling()
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
     return () => {
-      if (pollingInterval) clearInterval(pollingInterval)
+      stopPolling()
+      document.removeEventListener('visibilitychange', onVisibilityChange)
       sb.removeChannel(ch)
     }
   }, [load])

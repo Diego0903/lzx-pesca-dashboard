@@ -115,7 +115,7 @@ function ChartTooltip({ active, payload, label, fmt }: TooltipProps) {
 }
 
 export default function PedidosPage() {
-  const { leads, loading, source } = useCrm()
+  const { leads, loading, source, reload } = useCrm()
   const [page, setPage] = useState(0)
   const PAGE_SIZE = 8
 
@@ -171,10 +171,20 @@ export default function PedidosPage() {
 
   return (
     <div className="fade-in">
-      <div style={{ marginBottom: 16, fontSize: 11, color: 'var(--text-muted)' }}>
+      <div style={{ marginBottom: 16, fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <span className={`badge ${source === 'supabase' ? 'badge-green' : 'badge-red'}`}>
           {source === 'supabase' ? '🟢 Supabase conectado' : '🔴 Sem conexão com o banco'}
         </span>
+        <button
+          type="button"
+          onClick={() => void reload()}
+          className="btn-secondary"
+          style={{ padding: '4px 10px', fontSize: 11 }}
+          title="Atualizar dados agora"
+          disabled={loading}
+        >
+          {loading ? '⏳' : '↻'} Atualizar
+        </button>
       </div>
 
       {/* KPIs */}

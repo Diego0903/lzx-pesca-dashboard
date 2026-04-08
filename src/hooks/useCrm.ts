@@ -181,40 +181,50 @@ export function useCrm(): UseCrmResult {
 
   useEffect(() => { load() }, [load])
 
-  // Sincronização em tempo real entre clientes.
-  // Tenta Realtime primeiro; se falhar (ex: publication não habilitada no Postgres),
-  // faz fallback automático pra polling de 30 segundos. Assim a sincronização
-  // funciona mesmo se a migration 007_enable_realtime.sql não tiver sido aplicada.
+  // Sincronização entre clientes: Realtime (instantâneo) + Polling (a cada 20s
+  // como safety net). O polling SEMPRE roda independente do status do Realtime —
+  // garante consistência eventual mesmo se a publication Postgres não estiver
+  // habilitada (migration 007_enable_realtime.sql).
   useEffect(() => {
     if (!supabase) return
     const sb = supabase
     let debounceTimer: ReturnType<typeof setTimeout> | null = null
-    let pollingInterval: ReturnType<typeof setInterval> | null = null
 
     const debouncedReload = () => {
       if (debounceTimer) return
       debounceTimer = setTimeout(() => { debounceTimer = null; loadRef.current() }, 250)
     }
 
-    const startPollingFallback = () => {
-      if (pollingInterval) return
-      console.warn('[useCrm] Realtime indisponível — usando polling 30s')
-      pollingInterval = setInterval(() => loadRef.current(), 30000)
-    }
-
     const channel = sb
       .channel('crm-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' },        debouncedReload)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'interactions' }, debouncedReload)
-      .subscribe(status => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-          startPollingFallback()
-        }
-      })
+      .subscribe()
+
+    // Polling garantido a cada 20s — pausa quando a tab está oculta pra economizar requests
+    let pollingInterval: ReturnType<typeof setInterval> | null = null
+    const startPolling = () => {
+      if (pollingInterval) return
+      pollingInterval = setInterval(() => loadRef.current(), 20000)
+    }
+    const stopPolling = () => {
+      if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null }
+    }
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadRef.current()  // refresh imediato ao voltar pra tab
+        startPolling()
+      } else {
+        stopPolling()
+      }
+    }
+    if (document.visibilityState === 'visible') startPolling()
+    document.addEventListener('visibilitychange', onVisibilityChange)
 
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer)
-      if (pollingInterval) clearInterval(pollingInterval)
+      stopPolling()
+      document.removeEventListener('visibilitychange', onVisibilityChange)
       sb.removeChannel(channel)
     }
   }, [])

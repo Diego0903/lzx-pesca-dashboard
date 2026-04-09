@@ -1,15 +1,28 @@
+import { supabase } from './lib/supabase'
+
 const BASE = '/api'
 
+// Anexa o JWT do Supabase nas requests pro middleware requireAuth do server.
+// Sem token o server retorna 401.
+async function authHeaders(): Promise<Record<string, string>> {
+  if (!supabase) return {}
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) return {}
+  return { Authorization: `Bearer ${session.access_token}` }
+}
+
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`)
+  const headers = await authHeaders()
+  const res = await fetch(`${BASE}${path}`, { headers })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   return res.json()
 }
 
 async function post<T>(path: string, body: object): Promise<T> {
+  const headers = await authHeaders()
   const res = await fetch(`${BASE}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify(body),
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)

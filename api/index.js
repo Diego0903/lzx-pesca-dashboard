@@ -56,8 +56,97 @@ async function getMetaToken() {
 }
 
 const app = express()
-app.use(cors())
+
+// ── CORS ──────────────────────────────────────────────────────
+// Lista branca de origens. Vercel preview deploys têm subdomínio
+// dinâmico (lzx-pesca-dashboard-<hash>.vercel.app), então usamos regex.
+const ALLOWED_ORIGINS = [
+  'https://lzx-pesca-dashboard.vercel.app',
+  'http://localhost:3000',
+  'http://localhost:5173',
+]
+const VERCEL_PREVIEW_RE = /^https:\/\/lzx-pesca-dashboard-[a-z0-9-]+\.vercel\.app$/
+
+app.use(cors({
+  origin: (origin, cb) => {
+    // Sem origin (curl, server-to-server, mesmo domínio): permite
+    if (!origin) return cb(null, true)
+    if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true)
+    if (VERCEL_PREVIEW_RE.test(origin)) return cb(null, true)
+    cb(new Error('Origem não autorizada'))
+  },
+  credentials: false,
+}))
+
 app.use(express.json())
+
+// ── Auth middleware ───────────────────────────────────────────
+// Valida o JWT do Supabase em todas as rotas /api/*. O frontend manda
+// o token como Authorization: Bearer <token>. Validamos a assinatura
+// + buscamos perfil/status do usuário em public.usuarios.
+//
+// Cache em memória de 60s por token pra reduzir hits no Auth API.
+// Em serverless o cache só sobrevive dentro da mesma instância warm.
+const userCache = new Map()
+const AUTH_CACHE_TTL = 60_000
+
+async function requireAuth(req, res, next) {
+  if (req.method === 'OPTIONS') return next()
+
+  if (!supabaseAdmin) {
+    return res.status(503).json({ error: 'Auth não configurada no servidor' })
+  }
+
+  const auth = req.headers.authorization
+  if (!auth?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Token ausente' })
+  }
+  const token = auth.slice(7)
+
+  // Cache hit?
+  const cached = userCache.get(token)
+  if (cached && Date.now() < cached.expiresAt) {
+    req.user = cached.user
+    return next()
+  }
+
+  try {
+    // 1. Valida assinatura/expiração do JWT no Supabase Auth
+    const { data: { user }, error: userErr } = await supabaseAdmin.auth.getUser(token)
+    if (userErr || !user) {
+      return res.status(401).json({ error: 'Token inválido' })
+    }
+
+    // 2. Confirma que o usuário existe + está ativo + é admin/dono
+    //    (todas as rotas /api/* são features de Marketing, então funcionário
+    //     não tem permissão — RLS no Postgres já bloqueia, mas aqui também)
+    const { data: profile, error: profErr } = await supabaseAdmin
+      .from('usuarios')
+      .select('id, perfil, status')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    if (profErr || !profile) {
+      return res.status(403).json({ error: 'Usuário não encontrado' })
+    }
+    if (profile.status !== 'ativo') {
+      return res.status(403).json({ error: 'Conta não está ativa' })
+    }
+    if (profile.perfil !== 'admin' && profile.perfil !== 'dono') {
+      return res.status(403).json({ error: 'Acesso negado' })
+    }
+
+    const userInfo = { id: user.id, perfil: profile.perfil }
+    userCache.set(token, { user: userInfo, expiresAt: Date.now() + AUTH_CACHE_TTL })
+    req.user = userInfo
+    next()
+  } catch (e) {
+    console.error('[requireAuth]', e?.message)
+    res.status(500).json({ error: 'Erro de autenticação' })
+  }
+}
+
+app.use('/api', requireAuth)
 
 async function metaFetch(path, params = {}) {
   const TOKEN = await getMetaToken()
@@ -490,7 +579,13 @@ app.get('/api/cached', (_req, res) => {
 })
 
 app.get('/api/cached/:filename', (req, res) => {
-  const file = join(DATA_DIR, req.params.filename)
+  // Whitelist de nomes válidos: só letras/números/_/-, terminando em .json.
+  // Bloqueia path traversal (../, /, \) e qualquer extensão fora .json.
+  const name = req.params.filename
+  if (!/^[\w-]+\.json$/.test(name)) {
+    return res.status(400).json({ error: 'Nome de arquivo inválido' })
+  }
+  const file = join(DATA_DIR, name)
   if (existsSync(file)) res.json(JSON.parse(readFileSync(file, 'utf-8')))
   else res.status(404).json({ error: 'Arquivo não encontrado' })
 })

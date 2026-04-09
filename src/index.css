@@ -182,6 +182,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .header-title { display: flex; align-items: center; gap: 16px; }
 .header-title-text { display: block; }
 .header-divider { display: block; }
+.hide-on-mobile { display: contents; }
+.show-on-mobile { display: none; }
 .main-content { padding: 20px 16px; max-width: 1440px; margin: 0 auto; }
 .report-btn-label { display: inline; }
 .campaign-filter { width: 220px; }
@@ -200,6 +202,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .report-btn-label { display: none; }
   .campaign-filter { width: 130px; }
   .date-filter-dropdown { right: auto; left: 0; }
+  .hide-on-mobile { display: none !important; }
+  .show-on-mobile { display: flex !important; }
 }
 
 /* ── Glassmorphism — otimizado para performance ─────── */

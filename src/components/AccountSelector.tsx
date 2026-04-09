@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react'
+
 interface Account {
   id: string
   name: string
@@ -11,6 +13,7 @@ interface Props {
   accounts: Account[]
   selected: string
   onChange: (id: string) => void
+  mobileExtras?: ReactNode
 }
 
 const STATUS_MAP: Record<number, { label: string; color: string }> = {
@@ -24,13 +27,11 @@ const STATUS_MAP: Record<number, { label: string; color: string }> = {
   201: { label: 'Limite Gasto', color: 'var(--red)' },
 }
 
-export default function AccountSelector({ accounts, selected, onChange }: Props) {
+export default function AccountSelector({ accounts, selected, onChange, mobileExtras }: Props) {
   return (
     <div style={{ marginBottom: 24 }}>
-      <div style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 700, marginBottom: 10, fontSize: 12, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-        Conta de Anúncio
-      </div>
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
         {accounts.map(acc => {
           const status = STATUS_MAP[acc.account_status] || { label: `Status ${acc.account_status}`, color: 'var(--text-muted)' }
           const isSelected = acc.id === selected
@@ -57,6 +58,12 @@ export default function AccountSelector({ accounts, selected, onChange }: Props)
             </button>
           )
         })}
+        </div>
+        {mobileExtras && (
+          <div className="show-on-mobile" style={{ display: 'none', alignItems: 'center', gap: 8 }}>
+            {mobileExtras}
+          </div>
+        )}
       </div>
     </div>
   )

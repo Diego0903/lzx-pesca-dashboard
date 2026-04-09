@@ -272,28 +272,30 @@ export default function App() {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button
-            onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
-            title={theme === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
-            style={{
-              background: 'var(--surface2)',
-              border: '1px solid var(--border)',
-              borderRadius: 7,
-              width: 34,
-              height: 34,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              fontSize: 16,
-              flexShrink: 0,
-            }}
-          >
-            {theme === 'dark' ? '☀️' : '🌙'}
-          </button>
-          {hasAdsAccess && section === 'marketing' && (
-            <DateFilter value={dateRange} onChange={setDateRange} />
-          )}
+          <span className="hide-on-mobile" style={{ display: 'contents' }}>
+            <button
+              onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
+              title={theme === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
+              style={{
+                background: 'var(--surface2)',
+                border: '1px solid var(--border)',
+                borderRadius: 7,
+                width: 34,
+                height: 34,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                fontSize: 16,
+                flexShrink: 0,
+              }}
+            >
+              {theme === 'dark' ? '☀️' : '🌙'}
+            </button>
+            {hasAdsAccess && section === 'marketing' && (
+              <DateFilter value={dateRange} onChange={setDateRange} />
+            )}
+          </span>
           <RefreshButton lastUpdatedAt={crmLastUpdatedAt} loading={crmLoading} onRefresh={() => void reloadCrm()} />
           <UserMenu />
           {selectedAccount && hasAdsAccess && (
@@ -391,6 +393,31 @@ export default function App() {
             accounts={accounts}
             selected={selectedAccount}
             onChange={setSelectedAccount}
+            mobileExtras={
+              <>
+                <button
+                  onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
+                  title={theme === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
+                  aria-label="Alternar tema"
+                  style={{
+                    background: 'var(--surface2)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 7,
+                    width: 34,
+                    height: 34,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    fontSize: 16,
+                    flexShrink: 0,
+                  }}
+                >
+                  {theme === 'dark' ? '☀️' : '🌙'}
+                </button>
+                <DateFilter value={dateRange} onChange={setDateRange} />
+              </>
+            }
           />
         )}
 
